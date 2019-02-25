@@ -1,19 +1,21 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using StardewModdingAPI.Framework.PerformanceMonitoring;
 
 namespace StardewModdingAPI.Framework.Events
 {
     /// <summary>An event wrapper which intercepts and logs errors in handler code.</summary>
     /// <typeparam name="TEventArgs">The event arguments type.</typeparam>
-    internal class ManagedEvent<TEventArgs> : IManagedEvent
+    internal class ManagedEvent<TEventArgs>
     {
         /*********
         ** Fields
         *********/
         /// <summary>The underlying event.</summary>
         private event EventHandler<TEventArgs> Event;
+
+        /// <summary>A human-readable name for the event.</summary>
+        private readonly string EventName;
 
         /// <summary>Writes messages to the log.</summary>
         private readonly IMonitor Monitor;
@@ -27,19 +29,6 @@ namespace StardewModdingAPI.Framework.Events
         /// <summary>The cached invocation list.</summary>
         private EventHandler<TEventArgs>[] CachedInvocationList;
 
-        /// <summary>Tracks performance metrics.</summary>
-        private readonly PerformanceMonitor PerformanceMonitor;
-
-
-        /*********
-        ** Accessors
-        *********/
-        /// <summary>A human-readable name for the event.</summary>
-        public string EventName { get; }
-
-        /// <summary>Whether the event is typically called at least once per second.</summary>
-        public bool IsPerformanceCritical { get; }
-
 
         /*********
         ** Public methods
@@ -48,15 +37,11 @@ namespace StardewModdingAPI.Framework.Events
         /// <param name="eventName">A human-readable name for the event.</param>
         /// <param name="monitor">Writes messages to the log.</param>
         /// <param name="modRegistry">The mod registry with which to identify mods.</param>
-        /// <param name="performanceMonitor">Tracks performance metrics.</param>
-        /// <param name="isPerformanceCritical">Whether the event is typically called at least once per second.</param>
-        public ManagedEvent(string eventName, IMonitor monitor, ModRegistry modRegistry, PerformanceMonitor performanceMonitor, bool isPerformanceCritical = false)
+        public ManagedEvent(string eventName, IMonitor monitor, ModRegistry modRegistry)
         {
             this.EventName = eventName;
             this.Monitor = monitor;
             this.ModRegistry = modRegistry;
-            this.PerformanceMonitor = performanceMonitor;
-            this.IsPerformanceCritical = isPerformanceCritical;
         }
 
         /// <summary>Get whether anything is listening to the event.</summary>
@@ -96,21 +81,17 @@ namespace StardewModdingAPI.Framework.Events
             if (this.Event == null)
                 return;
 
-
-            this.PerformanceMonitor.Track(this.EventName, () =>
+            foreach (EventHandler<TEventArgs> handler in this.CachedInvocationList)
             {
-                foreach (EventHandler<TEventArgs> handler in this.CachedInvocationList)
+                try
                 {
-                    try
-                    {
-                        this.PerformanceMonitor.Track(this.EventName, this.GetModNameForPerformanceCounters(handler), () => handler.Invoke(null, args));
-                    }
-                    catch (Exception ex)
-                    {
-                        this.LogError(handler, ex);
-                    }
+                    handler.Invoke(null, args);
                 }
-            });
+                catch (Exception ex)
+                {
+                    this.LogError(handler, ex);
+                }
+            }
         }
 
         /// <summary>Raise the event and notify all handlers.</summary>
@@ -141,19 +122,6 @@ namespace StardewModdingAPI.Framework.Events
         /*********
         ** Private methods
         *********/
-        /// <summary>Get the mod name for a given event handler to display in performance monitoring reports.</summary>
-        /// <param name="handler">The event handler.</param>
-        private string GetModNameForPerformanceCounters(EventHandler<TEventArgs> handler)
-        {
-            IModMetadata mod = this.GetSourceMod(handler);
-            if (mod == null)
-                return Constants.GamePerformanceCounterName;
-
-            return mod.HasManifest()
-                ? mod.Manifest.UniqueID
-                : mod.DisplayName;
-        }
-
         /// <summary>Track an event handler.</summary>
         /// <param name="mod">The mod which added the handler.</param>
         /// <param name="handler">The event handler.</param>

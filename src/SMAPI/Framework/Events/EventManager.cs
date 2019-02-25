@@ -1,8 +1,5 @@
-using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using System.Reflection;
 using StardewModdingAPI.Events;
-using StardewModdingAPI.Framework.PerformanceMonitoring;
 
 namespace StardewModdingAPI.Framework.Events
 {
@@ -76,7 +73,7 @@ namespace StardewModdingAPI.Framework.Events
         /// <summary>Raised after the game finishes writing data to the save file (except the initial save creation).</summary>
         public readonly ManagedEvent<SavedEventArgs> Saved;
 
-        /// <summary>Raised after the player loads a save slot and the world is initialized.</summary>
+        /// <summary>Raised after the player loads a save slot and the world is initialised.</summary>
         public readonly ManagedEvent<SaveLoadedEventArgs> SaveLoaded;
 
         /// <summary>Raised after the game begins a new day, including when loading a save.</summary>
@@ -151,22 +148,19 @@ namespace StardewModdingAPI.Framework.Events
         /// <summary>Raised after objects are added or removed in a location.</summary>
         public readonly ManagedEvent<ObjectListChangedEventArgs> ObjectListChanged;
 
-        /// <summary>Raised after items are added or removed from a chest.</summary>
-        public readonly ManagedEvent<ChestInventoryChangedEventArgs> ChestInventoryChanged;
-
         /// <summary>Raised after terrain features (like floors and trees) are added or removed in a location.</summary>
         public readonly ManagedEvent<TerrainFeatureListChangedEventArgs> TerrainFeatureListChanged;
 
         /****
-        ** Specialized
+        ** Specialised
         ****/
-        /// <summary>Raised when the low-level stage in the game's loading process has changed. See notes on <see cref="ISpecializedEvents.LoadStageChanged"/>.</summary>
+        /// <summary>Raised when the low-level stage in the game's loading process has changed. See notes on <see cref="ISpecialisedEvents.LoadStageChanged"/>.</summary>
         public readonly ManagedEvent<LoadStageChangedEventArgs> LoadStageChanged;
 
-        /// <summary>Raised before the game performs its overall update tick (≈60 times per second). See notes on <see cref="ISpecializedEvents.UnvalidatedUpdateTicking"/>.</summary>
+        /// <summary>Raised before the game performs its overall update tick (≈60 times per second). See notes on <see cref="ISpecialisedEvents.UnvalidatedUpdateTicking"/>.</summary>
         public readonly ManagedEvent<UnvalidatedUpdateTickingEventArgs> UnvalidatedUpdateTicking;
 
-        /// <summary>Raised after the game performs its overall update tick (≈60 times per second). See notes on <see cref="ISpecializedEvents.UnvalidatedUpdateTicked"/>.</summary>
+        /// <summary>Raised after the game performs its overall update tick (≈60 times per second). See notes on <see cref="ISpecialisedEvents.UnvalidatedUpdateTicked"/>.</summary>
         public readonly ManagedEvent<UnvalidatedUpdateTickedEventArgs> UnvalidatedUpdateTicked;
 
 
@@ -176,32 +170,28 @@ namespace StardewModdingAPI.Framework.Events
         /// <summary>Construct an instance.</summary>
         /// <param name="monitor">Writes messages to the log.</param>
         /// <param name="modRegistry">The mod registry with which to identify mods.</param>
-        /// <param name="performanceMonitor">Tracks performance metrics.</param>
-        public EventManager(IMonitor monitor, ModRegistry modRegistry, PerformanceMonitor performanceMonitor)
+        public EventManager(IMonitor monitor, ModRegistry modRegistry)
         {
-            // create shortcut initializers
-            ManagedEvent<TEventArgs> ManageEventOf<TEventArgs>(string typeName, string eventName, bool isPerformanceCritical = false)
-            {
-                return new ManagedEvent<TEventArgs>($"{typeName}.{eventName}", monitor, modRegistry, performanceMonitor, isPerformanceCritical);
-            }
+            // create shortcut initialisers
+            ManagedEvent<TEventArgs> ManageEventOf<TEventArgs>(string typeName, string eventName) => new ManagedEvent<TEventArgs>($"{typeName}.{eventName}", monitor, modRegistry);
 
             // init events (new)
             this.MenuChanged = ManageEventOf<MenuChangedEventArgs>(nameof(IModEvents.Display), nameof(IDisplayEvents.MenuChanged));
-            this.Rendering = ManageEventOf<RenderingEventArgs>(nameof(IModEvents.Display), nameof(IDisplayEvents.Rendering), isPerformanceCritical: true);
-            this.Rendered = ManageEventOf<RenderedEventArgs>(nameof(IModEvents.Display), nameof(IDisplayEvents.Rendered), isPerformanceCritical: true);
-            this.RenderingWorld = ManageEventOf<RenderingWorldEventArgs>(nameof(IModEvents.Display), nameof(IDisplayEvents.RenderingWorld), isPerformanceCritical: true);
-            this.RenderedWorld = ManageEventOf<RenderedWorldEventArgs>(nameof(IModEvents.Display), nameof(IDisplayEvents.RenderedWorld), isPerformanceCritical: true);
-            this.RenderingActiveMenu = ManageEventOf<RenderingActiveMenuEventArgs>(nameof(IModEvents.Display), nameof(IDisplayEvents.RenderingActiveMenu), isPerformanceCritical: true);
-            this.RenderedActiveMenu = ManageEventOf<RenderedActiveMenuEventArgs>(nameof(IModEvents.Display), nameof(IDisplayEvents.RenderedActiveMenu), isPerformanceCritical: true);
-            this.RenderingHud = ManageEventOf<RenderingHudEventArgs>(nameof(IModEvents.Display), nameof(IDisplayEvents.RenderingHud), isPerformanceCritical: true);
-            this.RenderedHud = ManageEventOf<RenderedHudEventArgs>(nameof(IModEvents.Display), nameof(IDisplayEvents.RenderedHud), isPerformanceCritical: true);
+            this.Rendering = ManageEventOf<RenderingEventArgs>(nameof(IModEvents.Display), nameof(IDisplayEvents.Rendering));
+            this.Rendered = ManageEventOf<RenderedEventArgs>(nameof(IModEvents.Display), nameof(IDisplayEvents.Rendered));
+            this.RenderingWorld = ManageEventOf<RenderingWorldEventArgs>(nameof(IModEvents.Display), nameof(IDisplayEvents.RenderingWorld));
+            this.RenderedWorld = ManageEventOf<RenderedWorldEventArgs>(nameof(IModEvents.Display), nameof(IDisplayEvents.RenderedWorld));
+            this.RenderingActiveMenu = ManageEventOf<RenderingActiveMenuEventArgs>(nameof(IModEvents.Display), nameof(IDisplayEvents.RenderingActiveMenu));
+            this.RenderedActiveMenu = ManageEventOf<RenderedActiveMenuEventArgs>(nameof(IModEvents.Display), nameof(IDisplayEvents.RenderedActiveMenu));
+            this.RenderingHud = ManageEventOf<RenderingHudEventArgs>(nameof(IModEvents.Display), nameof(IDisplayEvents.RenderingHud));
+            this.RenderedHud = ManageEventOf<RenderedHudEventArgs>(nameof(IModEvents.Display), nameof(IDisplayEvents.RenderedHud));
             this.WindowResized = ManageEventOf<WindowResizedEventArgs>(nameof(IModEvents.Display), nameof(IDisplayEvents.WindowResized));
 
             this.GameLaunched = ManageEventOf<GameLaunchedEventArgs>(nameof(IModEvents.GameLoop), nameof(IGameLoopEvents.GameLaunched));
-            this.UpdateTicking = ManageEventOf<UpdateTickingEventArgs>(nameof(IModEvents.GameLoop), nameof(IGameLoopEvents.UpdateTicking), isPerformanceCritical: true);
-            this.UpdateTicked = ManageEventOf<UpdateTickedEventArgs>(nameof(IModEvents.GameLoop), nameof(IGameLoopEvents.UpdateTicked), isPerformanceCritical: true);
-            this.OneSecondUpdateTicking = ManageEventOf<OneSecondUpdateTickingEventArgs>(nameof(IModEvents.GameLoop), nameof(IGameLoopEvents.OneSecondUpdateTicking), isPerformanceCritical: true);
-            this.OneSecondUpdateTicked = ManageEventOf<OneSecondUpdateTickedEventArgs>(nameof(IModEvents.GameLoop), nameof(IGameLoopEvents.OneSecondUpdateTicked), isPerformanceCritical: true);
+            this.UpdateTicking = ManageEventOf<UpdateTickingEventArgs>(nameof(IModEvents.GameLoop), nameof(IGameLoopEvents.UpdateTicking));
+            this.UpdateTicked = ManageEventOf<UpdateTickedEventArgs>(nameof(IModEvents.GameLoop), nameof(IGameLoopEvents.UpdateTicked));
+            this.OneSecondUpdateTicking = ManageEventOf<OneSecondUpdateTickingEventArgs>(nameof(IModEvents.GameLoop), nameof(IGameLoopEvents.OneSecondUpdateTicking));
+            this.OneSecondUpdateTicked = ManageEventOf<OneSecondUpdateTickedEventArgs>(nameof(IModEvents.GameLoop), nameof(IGameLoopEvents.OneSecondUpdateTicked));
             this.SaveCreating = ManageEventOf<SaveCreatingEventArgs>(nameof(IModEvents.GameLoop), nameof(IGameLoopEvents.SaveCreating));
             this.SaveCreated = ManageEventOf<SaveCreatedEventArgs>(nameof(IModEvents.GameLoop), nameof(IGameLoopEvents.SaveCreated));
             this.Saving = ManageEventOf<SavingEventArgs>(nameof(IModEvents.GameLoop), nameof(IGameLoopEvents.Saving));
@@ -214,7 +204,7 @@ namespace StardewModdingAPI.Framework.Events
 
             this.ButtonPressed = ManageEventOf<ButtonPressedEventArgs>(nameof(IModEvents.Input), nameof(IInputEvents.ButtonPressed));
             this.ButtonReleased = ManageEventOf<ButtonReleasedEventArgs>(nameof(IModEvents.Input), nameof(IInputEvents.ButtonReleased));
-            this.CursorMoved = ManageEventOf<CursorMovedEventArgs>(nameof(IModEvents.Input), nameof(IInputEvents.CursorMoved), isPerformanceCritical: true);
+            this.CursorMoved = ManageEventOf<CursorMovedEventArgs>(nameof(IModEvents.Input), nameof(IInputEvents.CursorMoved));
             this.MouseWheelScrolled = ManageEventOf<MouseWheelScrolledEventArgs>(nameof(IModEvents.Input), nameof(IInputEvents.MouseWheelScrolled));
 
             this.PeerContextReceived = ManageEventOf<PeerContextReceivedEventArgs>(nameof(IModEvents.Multiplayer), nameof(IMultiplayerEvents.PeerContextReceived));
@@ -231,19 +221,11 @@ namespace StardewModdingAPI.Framework.Events
             this.LocationListChanged = ManageEventOf<LocationListChangedEventArgs>(nameof(IModEvents.World), nameof(IWorldEvents.BuildingListChanged));
             this.NpcListChanged = ManageEventOf<NpcListChangedEventArgs>(nameof(IModEvents.World), nameof(IWorldEvents.NpcListChanged));
             this.ObjectListChanged = ManageEventOf<ObjectListChangedEventArgs>(nameof(IModEvents.World), nameof(IWorldEvents.ObjectListChanged));
-            this.ChestInventoryChanged = ManageEventOf<ChestInventoryChangedEventArgs>(nameof(IModEvents.World), nameof(IWorldEvents.ChestInventoryChanged));
             this.TerrainFeatureListChanged = ManageEventOf<TerrainFeatureListChangedEventArgs>(nameof(IModEvents.World), nameof(IWorldEvents.TerrainFeatureListChanged));
 
-            this.LoadStageChanged = ManageEventOf<LoadStageChangedEventArgs>(nameof(IModEvents.Specialized), nameof(ISpecializedEvents.LoadStageChanged));
-            this.UnvalidatedUpdateTicking = ManageEventOf<UnvalidatedUpdateTickingEventArgs>(nameof(IModEvents.Specialized), nameof(ISpecializedEvents.UnvalidatedUpdateTicking), isPerformanceCritical: true);
-            this.UnvalidatedUpdateTicked = ManageEventOf<UnvalidatedUpdateTickedEventArgs>(nameof(IModEvents.Specialized), nameof(ISpecializedEvents.UnvalidatedUpdateTicked), isPerformanceCritical: true);
-        }
-
-        /// <summary>Get all managed events.</summary>
-        public IEnumerable<IManagedEvent> GetAllEvents()
-        {
-            foreach (FieldInfo field in this.GetType().GetFields())
-                yield return (IManagedEvent)field.GetValue(this);
+            this.LoadStageChanged = ManageEventOf<LoadStageChangedEventArgs>(nameof(IModEvents.Specialised), nameof(ISpecialisedEvents.LoadStageChanged));
+            this.UnvalidatedUpdateTicking = ManageEventOf<UnvalidatedUpdateTickingEventArgs>(nameof(IModEvents.Specialised), nameof(ISpecialisedEvents.UnvalidatedUpdateTicking));
+            this.UnvalidatedUpdateTicked = ManageEventOf<UnvalidatedUpdateTickedEventArgs>(nameof(IModEvents.Specialised), nameof(ISpecialisedEvents.UnvalidatedUpdateTicked));
         }
     }
 }

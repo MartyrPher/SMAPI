@@ -2,9 +2,9 @@ using System;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace StardewModdingAPI.Toolkit.Serialization.Converters
+namespace StardewModdingAPI.Toolkit.Serialisation.Converters
 {
-    /// <summary>Handles deserialization of <see cref="ISemanticVersion"/>.</summary>
+    /// <summary>Handles deserialisation of <see cref="ISemanticVersion"/>.</summary>
     internal class SemanticVersionConverter : JsonConverter
     {
         /*********
@@ -68,7 +68,7 @@ namespace StardewModdingAPI.Toolkit.Serialization.Converters
             int patch = obj.ValueIgnoreCase<int>(nameof(ISemanticVersion.PatchVersion));
             string prereleaseTag = obj.ValueIgnoreCase<string>(nameof(ISemanticVersion.PrereleaseTag));
 
-            return new SemanticVersion(major, minor, patch, prereleaseTag: prereleaseTag);
+            return new SemanticVersion(major, minor, patch, prereleaseTag);
         }
 
         /// <summary>Read a JSON string.</summary>
