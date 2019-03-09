@@ -3,6 +3,7 @@
 These changes have not been released yet.
 
 * For players:
+  * SMAPI now prevents invalid items from breaking menus on hover.
   * Fixed Save Backup not pruning old backups if they're uncompressed.
 
 * For modders:
