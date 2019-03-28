@@ -6,6 +6,9 @@ These changes have not been released yet.
   * Improved performance.
   * SMAPI now prevents invalid items from breaking menus on hover.
   * Fixed Save Backup not pruning old backups if they're uncompressed.
+  * Fixed issues when a farmhand reconnects before the game notices they're disconnected.
+  * Fixed 'received message' logs shown in non-developer mode.
+  * Fixed errors during early startup not shown before exit.
 
 * For modders:
   * Added support for content pack translations.
@@ -30,8 +33,10 @@ Released 17 March 2019 for Stardew Valley 1.3.36.
   * Updated mod compatibility list.
   * Fixed `world_clear` console command removing chests edited to have a debris name.
 
-* For the web UI:
+* For modders:
   * Added support for suppressing false-positive warnings in rare cases.
+
+* For the web UI:
   * The log parser now collapses redundant sections by default.
   * Fixed log parser column resize bug.
 
