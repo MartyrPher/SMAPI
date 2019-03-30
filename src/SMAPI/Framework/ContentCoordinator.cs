@@ -1,17 +1,15 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Threading;
+using System.Reflection;
 using Microsoft.Xna.Framework.Content;
 using StardewModdingAPI.Framework.Content;
 using StardewModdingAPI.Framework.ContentManagers;
 using StardewModdingAPI.Framework.Reflection;
-using StardewModdingAPI.Framework.StateTracking.Comparers;
 using StardewModdingAPI.Metadata;
-using StardewModdingAPI.Toolkit.Serialization;
+using StardewModdingAPI.Toolkit.Serialisation;
 using StardewModdingAPI.Toolkit.Utilities;
 using StardewValley;
 
@@ -44,15 +42,8 @@ namespace StardewModdingAPI.Framework
         /// <summary>The loaded content managers (including the <see cref="MainContentManager"/>).</summary>
         private readonly IList<IContentManager> ContentManagers = new List<IContentManager>();
 
-        /// <summary>The language code for language-agnostic mod assets.</summary>
-        private readonly LocalizedContentManager.LanguageCode DefaultLanguage = Constants.DefaultLanguage;
-
         /// <summary>Whether the content coordinator has been disposed.</summary>
         private bool IsDisposed;
-
-        /// <summary>A lock used to prevent asynchronous changes to the content manager list.</summary>
-        /// <remarks>The game may adds content managers in asynchronous threads (e.g. when populating the load screen).</remarks>
-        private readonly ReaderWriterLockSlim ContentManagerLock = new ReaderWriterLockSlim();
 
 
         /*********
@@ -65,10 +56,10 @@ namespace StardewModdingAPI.Framework
         public LocalizedContentManager.LanguageCode Language => this.MainContentManager.Language;
 
         /// <summary>Interceptors which provide the initial versions of matching assets.</summary>
-        public IList<ModLinked<IAssetLoader>> Loaders { get; } = new List<ModLinked<IAssetLoader>>();
+        public IDictionary<IModMetadata, IList<IAssetLoader>> Loaders { get; } = new Dictionary<IModMetadata, IList<IAssetLoader>>();
 
         /// <summary>Interceptors which edit matching assets after they're loaded.</summary>
-        public IList<ModLinked<IAssetEditor>> Editors { get; } = new List<ModLinked<IAssetEditor>>();
+        public IDictionary<IModMetadata, IList<IAssetEditor>> Editors { get; } = new Dictionary<IModMetadata, IList<IAssetEditor>>();
 
         /// <summary>The absolute path to the <see cref="ContentManager.RootDirectory"/>.</summary>
         public string FullRootDirectory { get; }
@@ -80,7 +71,7 @@ namespace StardewModdingAPI.Framework
         /// <summary>Construct an instance.</summary>
         /// <param name="serviceProvider">The service provider to use to locate services.</param>
         /// <param name="rootDirectory">The root directory to search for content.</param>
-        /// <param name="currentCulture">The current culture for which to localize content.</param>
+        /// <param name="currentCulture">The current culture for which to localise content.</param>
         /// <param name="monitor">Encapsulates monitoring and logging.</param>
         /// <param name="reflection">Simplifies access to private code.</param>
         /// <param name="jsonHelper">Encapsulates SMAPI's JSON file parsing.</param>
@@ -95,60 +86,32 @@ namespace StardewModdingAPI.Framework
             this.ContentManagers.Add(
                 this.MainContentManager = new GameContentManager("Game1.content", serviceProvider, rootDirectory, currentCulture, this, monitor, reflection, this.OnDisposing, onLoadingFirstAsset)
             );
-            this.CoreAssets = new CoreAssetPropagator(this.MainContentManager.AssertAndNormalizeAssetName, reflection, monitor);
+            this.CoreAssets = new CoreAssetPropagator(this.MainContentManager.AssertAndNormaliseAssetName, reflection, monitor);
         }
 
         /// <summary>Get a new content manager which handles reading files from the game content folder with support for interception.</summary>
         /// <param name="name">A name for the mod manager. Not guaranteed to be unique.</param>
         public GameContentManager CreateGameContentManager(string name)
         {
-            return this.ContentManagerLock.InWriteLock(() =>
-            {
-                GameContentManager manager = new GameContentManager(name, this.MainContentManager.ServiceProvider, this.MainContentManager.RootDirectory, this.MainContentManager.CurrentCulture, this, this.Monitor, this.Reflection, this.OnDisposing, this.OnLoadingFirstAsset);
-                this.ContentManagers.Add(manager);
-                return manager;
-            });
+            GameContentManager manager = new GameContentManager(name, this.MainContentManager.ServiceProvider, this.MainContentManager.RootDirectory, this.MainContentManager.CurrentCulture, this, this.Monitor, this.Reflection, this.OnDisposing, this.OnLoadingFirstAsset);
+            this.ContentManagers.Add(manager);
+            return manager;
         }
 
         /// <summary>Get a new content manager which handles reading files from a SMAPI mod folder with support for unpacked files.</summary>
         /// <param name="name">A name for the mod manager. Not guaranteed to be unique.</param>
         /// <param name="rootDirectory">The root directory to search for content (or <c>null</c> for the default).</param>
-        /// <param name="gameContentManager">The game content manager used for map tilesheets not provided by the mod.</param>
-        public ModContentManager CreateModContentManager(string name, string rootDirectory, IContentManager gameContentManager)
+        public ModContentManager CreateModContentManager(string name, string rootDirectory)
         {
-            return this.ContentManagerLock.InWriteLock(() =>
-            {
-                ModContentManager manager = new ModContentManager(
-                    name: name,
-                    gameContentManager: gameContentManager,
-                    serviceProvider: this.MainContentManager.ServiceProvider,
-                    rootDirectory: rootDirectory,
-                    currentCulture: this.MainContentManager.CurrentCulture,
-                    coordinator: this,
-                    monitor: this.Monitor,
-                    reflection: this.Reflection,
-                    jsonHelper: this.JsonHelper,
-                    onDisposing: this.OnDisposing
-                );
-                this.ContentManagers.Add(manager);
-                return manager;
-            });
+            ModContentManager manager = new ModContentManager(name, this.MainContentManager.ServiceProvider, rootDirectory, this.MainContentManager.CurrentCulture, this, this.Monitor, this.Reflection, this.JsonHelper, this.OnDisposing);
+            this.ContentManagers.Add(manager);
+            return manager;
         }
 
         /// <summary>Get the current content locale.</summary>
         public string GetLocale()
         {
             return this.MainContentManager.GetLocale(LocalizedContentManager.CurrentLanguageCode);
-        }
-
-        /// <summary>Perform any cleanup needed when the locale changes.</summary>
-        public void OnLocaleChanged()
-        {
-            this.ContentManagerLock.InReadLock(() =>
-            {
-                foreach (IContentManager contentManager in this.ContentManagers)
-                    contentManager.OnLocaleChanged();
-            });
         }
 
         /// <summary>Get whether this asset is mapped to a mod folder.</summary>
@@ -190,19 +153,73 @@ namespace StardewModdingAPI.Framework
 
         /// <summary>Get a copy of an asset from a mod folder.</summary>
         /// <typeparam name="T">The asset type.</typeparam>
+        /// <param name="internalKey">The internal asset key.</param>
         /// <param name="contentManagerID">The unique name for the content manager which should load this asset.</param>
         /// <param name="relativePath">The internal SMAPI asset key.</param>
-        public T LoadManagedAsset<T>(string contentManagerID, string relativePath)
+        /// <param name="language">The language code for which to load content.</param>
+        public T LoadAndCloneManagedAsset<T>(string internalKey, string contentManagerID, string relativePath, LocalizedContentManager.LanguageCode language)
         {
             // get content manager
-            IContentManager contentManager = this.ContentManagerLock.InReadLock(() =>
-                this.ContentManagers.FirstOrDefault(p => p.IsNamespaced && p.Name == contentManagerID)
-            );
+            IContentManager contentManager = this.ContentManagers.FirstOrDefault(p => p.Name == contentManagerID);
             if (contentManager == null)
                 throw new InvalidOperationException($"The '{contentManagerID}' prefix isn't handled by any mod.");
 
-            // get fresh asset
-            return contentManager.Load<T>(relativePath, this.DefaultLanguage, useCache: false);
+            // get cloned asset
+            T data = contentManager.Load<T>(internalKey, language);
+            return contentManager.CloneIfPossible(data);
+        }
+
+        /// <summary>Purge assets from the cache that match one of the interceptors.</summary>
+        /// <param name="editors">The asset editors for which to purge matching assets.</param>
+        /// <param name="loaders">The asset loaders for which to purge matching assets.</param>
+        /// <returns>Returns the invalidated asset names.</returns>
+        public IEnumerable<string> InvalidateCacheFor(IAssetEditor[] editors, IAssetLoader[] loaders)
+        {
+            if (!editors.Any() && !loaders.Any())
+                return new string[0];
+
+            // get CanEdit/Load methods
+            MethodInfo canEdit = typeof(IAssetEditor).GetMethod(nameof(IAssetEditor.CanEdit));
+            MethodInfo canLoad = typeof(IAssetLoader).GetMethod(nameof(IAssetLoader.CanLoad));
+            if (canEdit == null || canLoad == null)
+                throw new InvalidOperationException("SMAPI could not access the interceptor methods."); // should never happen
+
+            // invalidate matching keys
+            return this.InvalidateCache(asset =>
+            {
+                // check loaders
+                MethodInfo canLoadGeneric = canLoad.MakeGenericMethod(asset.DataType);
+                foreach (IAssetLoader loader in loaders)
+                {
+                    try
+                    {
+                        if ((bool)canLoadGeneric.Invoke(loader, new object[] { asset }))
+                            return true;
+                    }
+                    catch (Exception ex)
+                    {
+                        this.GetModFor(loader).LogAsMod($"Mod failed when checking whether it could load asset '{asset.AssetName}'. Error details:\n{ex.GetLogSummary()}", LogLevel.Error);
+                    }
+                }
+
+                // check editors
+                MethodInfo canEditGeneric = canEdit.MakeGenericMethod(asset.DataType);
+                foreach (IAssetEditor editor in editors)
+                {
+                    try
+                    {
+                        if ((bool)canEditGeneric.Invoke(editor, new object[] { asset }))
+                            return true;
+                    }
+                    catch (Exception ex)
+                    {
+                        this.GetModFor(editor).LogAsMod($"Mod failed when checking whether it could edit asset '{asset.AssetName}'. Error details:\n{ex.GetLogSummary()}", LogLevel.Error);
+                    }
+                }
+
+                // asset not affected by a loader or editor
+                return false;
+            });
         }
 
         /// <summary>Purge matched assets from the cache.</summary>
@@ -214,7 +231,7 @@ namespace StardewModdingAPI.Framework
             string locale = this.GetLocale();
             return this.InvalidateCache((assetName, type) =>
             {
-                IAssetInfo info = new AssetInfo(locale, assetName, type, this.MainContentManager.AssertAndNormalizeAssetName);
+                IAssetInfo info = new AssetInfo(locale, assetName, type, this.MainContentManager.AssertAndNormaliseAssetName);
                 return predicate(info);
             }, dispose);
         }
@@ -225,48 +242,31 @@ namespace StardewModdingAPI.Framework
         /// <returns>Returns the invalidated asset names.</returns>
         public IEnumerable<string> InvalidateCache(Func<string, Type, bool> predicate, bool dispose = false)
         {
-            // invalidate cache & track removed assets
-            IDictionary<string, ISet<object>> removedAssets = new Dictionary<string, ISet<object>>(StringComparer.InvariantCultureIgnoreCase);
-            this.ContentManagerLock.InReadLock(() =>
+            // invalidate cache
+            IDictionary<string, Type> removedAssetNames = new Dictionary<string, Type>(StringComparer.InvariantCultureIgnoreCase);
+            foreach (IContentManager contentManager in this.ContentManagers)
             {
-                foreach (IContentManager contentManager in this.ContentManagers)
-                {
-                    foreach (var entry in contentManager.InvalidateCache(predicate, dispose))
-                    {
-                        if (!removedAssets.TryGetValue(entry.Key, out ISet<object> assets))
-                            removedAssets[entry.Key] = assets = new HashSet<object>(new ObjectReferenceComparer<object>());
-                        assets.Add(entry.Value);
-                    }
-                }
-            });
+                foreach (Tuple<string, Type> asset in contentManager.InvalidateCache(predicate, dispose))
+                    removedAssetNames[asset.Item1] = asset.Item2;
+            }
 
             // reload core game assets
-            if (removedAssets.Any())
+            int reloaded = 0;
+            foreach (var pair in removedAssetNames)
             {
-                IDictionary<string, bool> propagated = this.CoreAssets.Propagate(this.MainContentManager, removedAssets.ToDictionary(p => p.Key, p => p.Value.First().GetType())); // use an intercepted content manager
-                this.Monitor.Log($"Invalidated {removedAssets.Count} asset names ({string.Join(", ", removedAssets.Keys.OrderBy(p => p, StringComparer.InvariantCultureIgnoreCase))}); propagated {propagated.Count(p => p.Value)} core assets.", LogLevel.Trace);
+                string key = pair.Key;
+                Type type = pair.Value;
+                if (this.CoreAssets.Propagate(this.MainContentManager, key, type)) // use an intercepted content manager
+                    reloaded++;
             }
+
+            // report result
+            if (removedAssetNames.Any())
+                this.Monitor.Log($"Invalidated {removedAssetNames.Count} asset names: {string.Join(", ", removedAssetNames.Keys.OrderBy(p => p, StringComparer.InvariantCultureIgnoreCase))}. Reloaded {reloaded} core assets.", LogLevel.Trace);
             else
                 this.Monitor.Log("Invalidated 0 cache entries.", LogLevel.Trace);
 
-            return removedAssets.Keys;
-        }
-
-        /// <summary>Get all loaded instances of an asset name.</summary>
-        /// <param name="assetName">The asset name.</param>
-        [SuppressMessage("ReSharper", "UnusedMember.Global", Justification = "This method is provided for Content Patcher.")]
-        public IEnumerable<object> GetLoadedValues(string assetName)
-        {
-            return this.ContentManagerLock.InReadLock(() =>
-            {
-                List<object> values = new List<object>();
-                foreach (IContentManager content in this.ContentManagers.Where(p => !p.IsNamespaced && p.IsLoaded(assetName)))
-                {
-                    object value = content.Load<object>(assetName, this.Language, useCache: true);
-                    values.Add(value);
-                }
-                return values;
-            });
+            return removedAssetNames.Keys;
         }
 
         /// <summary>Dispose held resources.</summary>
@@ -281,8 +281,6 @@ namespace StardewModdingAPI.Framework
                 contentManager.Dispose();
             this.ContentManagers.Clear();
             this.MainContentManager = null;
-
-            this.ContentManagerLock.Dispose();
         }
 
 
@@ -296,9 +294,35 @@ namespace StardewModdingAPI.Framework
             if (this.IsDisposed)
                 return;
 
-            this.ContentManagerLock.InWriteLock(() =>
-                this.ContentManagers.Remove(contentManager)
-            );
+            this.ContentManagers.Remove(contentManager);
+        }
+
+        /// <summary>Get the mod which registered an asset loader.</summary>
+        /// <param name="loader">The asset loader.</param>
+        /// <exception cref="KeyNotFoundException">The given loader couldn't be matched to a mod.</exception>
+        private IModMetadata GetModFor(IAssetLoader loader)
+        {
+            foreach (var pair in this.Loaders)
+            {
+                if (pair.Value.Contains(loader))
+                    return pair.Key;
+            }
+
+            throw new KeyNotFoundException("This loader isn't associated with a known mod.");
+        }
+
+        /// <summary>Get the mod which registered an asset editor.</summary>
+        /// <param name="editor">The asset editor.</param>
+        /// <exception cref="KeyNotFoundException">The given editor couldn't be matched to a mod.</exception>
+        private IModMetadata GetModFor(IAssetEditor editor)
+        {
+            foreach (var pair in this.Editors)
+            {
+                if (pair.Value.Contains(editor))
+                    return pair.Key;
+            }
+
+            throw new KeyNotFoundException("This editor isn't associated with a known mod.");
         }
     }
 }
