@@ -5,7 +5,7 @@ using System.Reflection;
 using StardewModdingAPI.Enums;
 using StardewModdingAPI.Framework;
 using StardewModdingAPI.Framework.ModLoading;
-using StardewModdingAPI.Toolkit.Utilities;
+using StardewModdingAPI.Internal;
 using StardewValley;
 
 namespace StardewModdingAPI
@@ -20,10 +20,10 @@ namespace StardewModdingAPI
         ** Public
         ****/
         /// <summary>SMAPI's current semantic version.</summary>
-        public static ISemanticVersion ApiVersion { get; } = new Toolkit.SemanticVersion("3.2.0");
+        public static ISemanticVersion ApiVersion { get; } = new Toolkit.SemanticVersion("3.0.0");
 
         /// <summary>The minimum supported version of Stardew Valley.</summary>
-        public static ISemanticVersion MinimumGameVersion { get; } = new GameVersion("1.4.1");
+        public static ISemanticVersion MinimumGameVersion { get; } = new GameVersion("1.4.0");
 
         /// <summary>The maximum supported version of Stardew Valley.</summary>
         public static ISemanticVersion MaximumGameVersion { get; } = null;
@@ -55,20 +55,14 @@ namespace StardewModdingAPI
         /// <summary>The URL of the SMAPI home page.</summary>
         internal const string HomePageUrl = "https://smapi.io";
 
-        /// <summary>The default performance counter name for unknown event handlers.</summary>
-        internal const string GamePerformanceCounterName = "<StardewValley>";
-
         /// <summary>The absolute path to the folder containing SMAPI's internal files.</summary>
         internal static readonly string InternalFilesPath = Program.DllSearchPath;
 
         /// <summary>The file path for the SMAPI configuration file.</summary>
-        internal static string ApiConfigPath => Path.Combine(Constants.InternalFilesPath, "config.json");
-
-        /// <summary>The file path for the overrides file for <see cref="ApiConfigPath"/>, which is applied over it.</summary>
-        internal static string ApiUserConfigPath => Path.Combine(Constants.InternalFilesPath, "config.user.json");
+        internal static string ApiConfigPath => Path.Combine(Constants.InternalFilesPath, "StardewModdingAPI.config.json");
 
         /// <summary>The file path for the SMAPI metadata file.</summary>
-        internal static string ApiMetadataPath => Path.Combine(Constants.InternalFilesPath, "metadata.json");
+        internal static string ApiMetadataPath => Path.Combine(Constants.InternalFilesPath, "StardewModdingAPI.metadata.json");
 
         /// <summary>The filename prefix used for all SMAPI logs.</summary>
         internal static string LogNamePrefix { get; } = "SMAPI-";
@@ -103,9 +97,6 @@ namespace StardewModdingAPI
         /// <summary>The game's assembly name.</summary>
         internal static string GameAssemblyName => Constants.Platform == Platform.Windows ? "Stardew Valley" : "StardewValley";
 
-        /// <summary>The language code for non-translated mod assets.</summary>
-        internal static LocalizedContentManager.LanguageCode DefaultLanguage { get; } = LocalizedContentManager.LanguageCode.en;
-
 
         /*********
         ** Internal methods
@@ -117,13 +108,6 @@ namespace StardewModdingAPI
         {
             switch (version.ToString())
             {
-                case "1.3.36":
-                    return new SemanticVersion(2, 11, 2);
-
-                case "1.3.32":
-                case "1.3.33":
-                    return new SemanticVersion(2, 10, 2);
-
                 case "1.3.28":
                     return new SemanticVersion(2, 7, 0);
 
@@ -155,14 +139,12 @@ namespace StardewModdingAPI
                         "Microsoft.Xna.Framework",
                         "Microsoft.Xna.Framework.Game",
                         "Microsoft.Xna.Framework.Graphics",
-                        "Microsoft.Xna.Framework.Xact",
-                        "StardewModdingAPI.Toolkit.CoreInterfaces" // renamed in SMAPI 3.0
+                        "Microsoft.Xna.Framework.Xact"
                     };
                     targetAssemblies = new[]
                     {
                         typeof(StardewValley.Game1).Assembly, // note: includes Netcode types on Linux/Mac
-                        typeof(Microsoft.Xna.Framework.Vector2).Assembly,
-                        typeof(StardewModdingAPI.IManifest).Assembly
+                        typeof(Microsoft.Xna.Framework.Vector2).Assembly
                     };
                     break;
 
@@ -170,8 +152,7 @@ namespace StardewModdingAPI
                     removeAssemblyReferences = new[]
                     {
                         "StardewValley",
-                        "MonoGame.Framework",
-                        "StardewModdingAPI.Toolkit.CoreInterfaces" // renamed in SMAPI 3.0
+                        "MonoGame.Framework"
                     };
                     targetAssemblies = new[]
                     {
@@ -179,8 +160,7 @@ namespace StardewModdingAPI
                         typeof(StardewValley.Game1).Assembly,
                         typeof(Microsoft.Xna.Framework.Vector2).Assembly,
                         typeof(Microsoft.Xna.Framework.Game).Assembly,
-                        typeof(Microsoft.Xna.Framework.Graphics.SpriteBatch).Assembly,
-                        typeof(StardewModdingAPI.IManifest).Assembly
+                        typeof(Microsoft.Xna.Framework.Graphics.SpriteBatch).Assembly
                     };
                     break;
 
@@ -196,7 +176,7 @@ namespace StardewModdingAPI
         ** Private methods
         *********/
         /// <summary>Get the name of the save folder, if any.</summary>
-        private static string GetSaveFolderName()
+        internal static string GetSaveFolderName()
         {
             // save not available
             if (Context.LoadStage == LoadStage.None)
@@ -221,7 +201,7 @@ namespace StardewModdingAPI
         }
 
         /// <summary>Get the path to the current save folder, if any.</summary>
-        private static string GetSaveFolderPathIfExists()
+        internal static string GetSaveFolderPathIfExists()
         {
             string folderName = Constants.GetSaveFolderName();
             if (folderName == null)
