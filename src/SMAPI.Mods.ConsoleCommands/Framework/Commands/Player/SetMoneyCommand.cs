@@ -14,11 +14,18 @@ namespace StardewModdingAPI.Mods.ConsoleCommands.Framework.Commands.Player
 
 
         /*********
+        ** Accessors
+        *********/
+        /// <summary>Whether the command needs to perform logic when the game updates.</summary>
+        public override bool NeedsUpdate => this.InfiniteMoney;
+
+
+        /*********
         ** Public methods
         *********/
         /// <summary>Construct an instance.</summary>
         public SetMoneyCommand()
-            : base("player_setmoney", "Sets the player's money.\n\nUsage: player_setmoney <value>\n- value: an integer amount, or 'inf' for infinite money.", mayNeedUpdate: true) { }
+            : base("player_setmoney", "Sets the player's money.\n\nUsage: player_setmoney <value>\n- value: an integer amount, or 'inf' for infinite money.") { }
 
         /// <summary>Handle the command.</summary>
         /// <param name="monitor">Writes messages to the console and log file.</param>
@@ -55,9 +62,9 @@ namespace StardewModdingAPI.Mods.ConsoleCommands.Framework.Commands.Player
 
         /// <summary>Perform any logic needed on update tick.</summary>
         /// <param name="monitor">Writes messages to the console and log file.</param>
-        public override void OnUpdated(IMonitor monitor)
+        public override void Update(IMonitor monitor)
         {
-            if (this.InfiniteMoney && Context.IsWorldReady)
+            if (this.InfiniteMoney)
                 Game1.player.Money = 999999;
         }
     }
