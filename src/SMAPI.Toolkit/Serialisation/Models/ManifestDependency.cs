@@ -1,4 +1,4 @@
-namespace StardewModdingAPI.Toolkit.Serialization.Models
+namespace StardewModdingAPI.Toolkit.Serialisation.Models
 {
     /// <summary>A mod dependency listed in a mod manifest.</summary>
     public class ManifestDependency : IManifestDependency

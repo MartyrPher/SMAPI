@@ -1,10 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <AssemblyName>SaveBackup</AssemblyName>
     <RootNamespace>StardewModdingAPI.Mods.SaveBackup</RootNamespace>
+    <AssemblyName>SaveBackup</AssemblyName>
     <TargetFramework>net45</TargetFramework>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <LangVersion>latest</LangVersion>
+    <OutputPath>$(SolutionDir)\..\bin\$(Configuration)\Mods\SaveBackup</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <PlatformTarget>x86</PlatformTarget>
   </PropertyGroup>
@@ -16,10 +18,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Reference Include="$(GameExecutableName)">
-      <HintPath>$(GamePath)\$(GameExecutableName).exe</HintPath>
-      <Private>False</Private>
-    </Reference>
+    <Compile Include="..\..\build\GlobalAssemblyInfo.cs">
+      <Link>Properties\GlobalAssemblyInfo.cs</Link>
+    </Compile>
   </ItemGroup>
 
   <ItemGroup>

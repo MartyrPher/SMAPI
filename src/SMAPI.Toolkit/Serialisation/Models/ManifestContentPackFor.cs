@@ -1,4 +1,4 @@
-namespace StardewModdingAPI.Toolkit.Serialization.Models
+namespace StardewModdingAPI.Toolkit.Serialisation.Models
 {
     /// <summary>Indicates which mod can read the content pack represented by the containing manifest.</summary>
     public class ManifestContentPackFor : IManifestContentPackFor

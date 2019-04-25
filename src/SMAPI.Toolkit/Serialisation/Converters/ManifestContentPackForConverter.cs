@@ -1,13 +1,11 @@
 using System;
-using System.Collections.Generic;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using StardewModdingAPI.Toolkit.Serialization.Models;
+using StardewModdingAPI.Toolkit.Serialisation.Models;
 
-namespace StardewModdingAPI.Toolkit.Serialization.Converters
+namespace StardewModdingAPI.Toolkit.Serialisation.Converters
 {
-    /// <summary>Handles deserialization of <see cref="ManifestDependency"/> arrays.</summary>
-    internal class ManifestDependencyArrayConverter : JsonConverter
+    /// <summary>Handles deserialisation of <see cref="ManifestContentPackFor"/> arrays.</summary>
+    public class ManifestContentPackForConverter : JsonConverter
     {
         /*********
         ** Accessors
@@ -23,7 +21,7 @@ namespace StardewModdingAPI.Toolkit.Serialization.Converters
         /// <param name="objectType">The object type.</param>
         public override bool CanConvert(Type objectType)
         {
-            return objectType == typeof(ManifestDependency[]);
+            return objectType == typeof(ManifestContentPackFor[]);
         }
 
 
@@ -37,15 +35,7 @@ namespace StardewModdingAPI.Toolkit.Serialization.Converters
         /// <param name="serializer">The calling serializer.</param>
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
-            List<ManifestDependency> result = new List<ManifestDependency>();
-            foreach (JObject obj in JArray.Load(reader).Children<JObject>())
-            {
-                string uniqueID = obj.ValueIgnoreCase<string>(nameof(ManifestDependency.UniqueID));
-                string minVersion = obj.ValueIgnoreCase<string>(nameof(ManifestDependency.MinimumVersion));
-                bool required = obj.ValueIgnoreCase<bool?>(nameof(ManifestDependency.IsRequired)) ?? true;
-                result.Add(new ManifestDependency(uniqueID, minVersion, required));
-            }
-            return result.ToArray();
+            return serializer.Deserialize<ManifestContentPackFor>(reader);
         }
 
         /// <summary>Writes the JSON representation of the object.</summary>

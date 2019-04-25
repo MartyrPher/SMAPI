@@ -1,7 +1,7 @@
 using System;
 using Newtonsoft.Json.Linq;
 
-namespace StardewModdingAPI.Toolkit.Serialization
+namespace StardewModdingAPI.Toolkit.Serialisation
 {
     /// <summary>Provides extension methods for parsing JSON.</summary>
     public static class JsonExtensions

@@ -2,10 +2,10 @@ using System;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace StardewModdingAPI.Toolkit.Serialization.Converters
+namespace StardewModdingAPI.Toolkit.Serialisation.Converters
 {
-    /// <summary>The base implementation for simplified converters which deserialize <typeparamref name="T"/> without overriding serialization.</summary>
-    /// <typeparam name="T">The type to deserialize.</typeparam>
+    /// <summary>The base implementation for simplified converters which deserialise <typeparamref name="T"/> without overriding serialisation.</summary>
+    /// <typeparam name="T">The type to deserialise.</typeparam>
     internal abstract class SimpleReadOnlyConverter<T> : JsonConverter
     {
         /*********

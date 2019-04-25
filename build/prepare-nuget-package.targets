@@ -11,13 +11,11 @@
     </PropertyGroup>
     <RemoveDir Directories="$(PackagePath)" />
     <Copy SourceFiles="$(ProjectDir)/package.nuspec" DestinationFolder="$(PackagePath)" />
-    <Copy SourceFiles="$(SolutionDir)/../build/find-game-folder.targets" DestinationFolder="$(PackagePath)/build" />
     <Copy SourceFiles="$(ProjectDir)/build/smapi.targets" DestinationFiles="$(PackagePath)/build/Pathoschild.Stardew.ModBuildConfig.targets" />
-    <Copy SourceFiles="$(TargetDir)/assets/nuget-icon.png" DestinationFiles="$(PackagePath)/images/icon.png" />
     <Copy SourceFiles="$(TargetDir)/Newtonsoft.Json.dll" DestinationFolder="$(PackagePath)/build" />
     <Copy SourceFiles="$(TargetDir)/SMAPI.ModBuildConfig.dll" DestinationFolder="$(PackagePath)/build" />
     <Copy SourceFiles="$(TargetDir)/SMAPI.Toolkit.dll" DestinationFolder="$(PackagePath)/build" />
     <Copy SourceFiles="$(TargetDir)/SMAPI.Toolkit.CoreInterfaces.dll" DestinationFolder="$(PackagePath)/build" />
-    <Copy SourceFiles="$(SolutionDir)/SMAPI.ModBuildConfig.Analyzer/bin/netstandard2.0/SMAPI.ModBuildConfig.Analyzer.dll" DestinationFolder="$(PackagePath)/analyzers/dotnet/cs" />
+    <Copy SourceFiles="$(SolutionDir)/SMAPI.ModBuildConfig.Analyzer/bin/netstandard1.3/SMAPI.ModBuildConfig.Analyzer.dll" DestinationFolder="$(PackagePath)/analyzers/dotnet/cs" />
   </Target>
 </Project>
