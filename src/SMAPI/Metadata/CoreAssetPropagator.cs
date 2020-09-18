@@ -5,6 +5,7 @@ using System.Linq;
 using Microsoft.Xna.Framework.Graphics;
 using Netcode;
 using StardewModdingAPI.Framework.Reflection;
+using StardewModdingAPI.Toolkit.Utilities;
 using StardewValley;
 using StardewValley.BellsAndWhistles;
 using StardewValley.Buildings;
@@ -83,7 +84,7 @@ namespace StardewModdingAPI.Metadata
             });
 
             // reload assets
-            IDictionary<string, bool> propagated = assets.ToDictionary(p => p.Key, p => false, StringComparer.InvariantCultureIgnoreCase);
+            IDictionary<string, bool> propagated = assets.ToDictionary(p => p.Key, p => false, StringComparer.OrdinalIgnoreCase);
             foreach (var bucket in buckets)
             {
                 switch (bucket.Key)
@@ -385,6 +386,15 @@ namespace StardewModdingAPI.Metadata
                     Game1.shadowTexture = content.Load<Texture2D>(key);
                     return true;
 
+#if SMAPI_FOR_MOBILE
+                case "loosesprites\\mobileatlas_manually_made": // Game1.LoadContent
+                    Game1.mobileSpriteSheet = content.Load<Texture2D>(key);
+                    Game1.dayTimeMoneyBox.questButton.texture = Game1.mobileSpriteSheet;
+                    Game1.dayTimeMoneyBox.buttonF8.texture = Game1.mobileSpriteSheet;
+                    Game1.dayTimeMoneyBox.buttonGameMenu.texture = Game1.mobileSpriteSheet;
+                    return true;
+#endif
+
                 /****
                 ** Content\TileSheets
                 ****/
@@ -417,7 +427,11 @@ namespace StardewModdingAPI.Metadata
                     return true;
 
                 case "tilesheets\\tools": // Game1.ResetToolSpriteSheet
+#if SMAPI_FOR_MOBILE
                     Game1.toolSpriteSheet = content.Load<Texture2D>(key);
+#else
+                    Game1.ResetToolSpriteSheet();
+#endif
                     return true;
 
                 case "tilesheets\\weapons": // Game1.LoadContent
@@ -779,7 +793,7 @@ namespace StardewModdingAPI.Metadata
         private void ReloadNpcSprites(LocalizedContentManager content, IEnumerable<string> keys, IDictionary<string, bool> propagated)
         {
             // get NPCs
-            HashSet<string> lookup = new HashSet<string>(keys, StringComparer.InvariantCultureIgnoreCase);
+            HashSet<string> lookup = new HashSet<string>(keys, StringComparer.OrdinalIgnoreCase);
             var characters =
                 (
                     from npc in this.GetCharacters()
@@ -806,7 +820,7 @@ namespace StardewModdingAPI.Metadata
         private void ReloadNpcPortraits(LocalizedContentManager content, IEnumerable<string> keys, IDictionary<string, bool> propagated)
         {
             // get NPCs
-            HashSet<string> lookup = new HashSet<string>(keys, StringComparer.InvariantCultureIgnoreCase);
+            HashSet<string> lookup = new HashSet<string>(keys, StringComparer.OrdinalIgnoreCase);
             var characters =
                 (
                     from npc in this.GetCharacters()
@@ -816,9 +830,18 @@ namespace StardewModdingAPI.Metadata
                     where key != null && lookup.Contains(key)
                     select new { Npc = npc, Key = key }
                 )
-                .ToArray();
-            if (!characters.Any())
-                return;
+                .ToList();
+
+            // special case: Gil is a private NPC field on the AdventureGuild class (only used for the portrait)
+            {
+                string gilKey = this.NormalizeAssetNameIgnoringEmpty("Portraits/Gil");
+                if (lookup.Contains(gilKey))
+                {
+                    GameLocation adventureGuild = Game1.getLocationFromName("AdventureGuild");
+                    if (adventureGuild != null)
+                        characters.Add(new { Npc = this.Reflection.GetField<NPC>(adventureGuild, "Gil").GetValue(), Key = gilKey });
+                }
+            }
 
             // update portrait
             foreach (var target in characters)
@@ -887,10 +910,19 @@ namespace StardewModdingAPI.Metadata
                 return false;
 
             // update dialogue
+            // Note that marriage dialogue isn't reloaded after reset, but it doesn't need to be
+            // propagated anyway since marriage dialogue keys can't be added/removed and the field
+            // doesn't store the text itself.
             foreach (NPC villager in villagers)
             {
+                bool shouldSayMarriageDialogue = villager.shouldSayMarriageDialogue.Value;
+                MarriageDialogueReference[] marriageDialogue = villager.currentMarriageDialogue.ToArray();
+
                 villager.resetSeasonalDialogue(); // doesn't only affect seasonal dialogue
                 villager.resetCurrentDialogue();
+
+                villager.shouldSayMarriageDialogue.Set(shouldSayMarriageDialogue);
+                villager.currentMarriageDialogue.Set(marriageDialogue);
             }
 
             return true;
@@ -944,7 +976,14 @@ namespace StardewModdingAPI.Metadata
         /// <summary>Get all NPCs in the game (excluding farm animals).</summary>
         private IEnumerable<NPC> GetCharacters()
         {
-            return this.GetLocations().SelectMany(p => p.characters);
+            foreach (NPC character in this.GetLocations().SelectMany(p => p.characters))
+                yield return character;
+
+            if (Game1.CurrentEvent?.actors != null)
+            {
+                foreach (NPC character in Game1.CurrentEvent.actors)
+                    yield return character;
+            }
         }
 
         /// <summary>Get all farm animals in the game.</summary>
@@ -1007,7 +1046,7 @@ namespace StardewModdingAPI.Metadata
             if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(rawSubstring))
                 return false;
 
-            return key.StartsWith(this.NormalizeAssetNameIgnoringEmpty(rawSubstring), StringComparison.InvariantCultureIgnoreCase);
+            return key.StartsWith(this.NormalizeAssetNameIgnoringEmpty(rawSubstring), StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>Get whether a normalized asset key is in the given folder.</summary>
@@ -1025,9 +1064,9 @@ namespace StardewModdingAPI.Metadata
         /// <param name="path">The path to check.</param>
         private string[] GetSegments(string path)
         {
-            if (path == null)
-                return new string[0];
-            return path.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            return path != null
+                ? PathUtilities.GetSegments(path)
+                : new string[0];
         }
 
         /// <summary>Count the number of segments in a path (e.g. 'a/b' is 2).</summary>

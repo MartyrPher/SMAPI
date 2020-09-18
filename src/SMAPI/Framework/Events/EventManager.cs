@@ -11,7 +11,7 @@ namespace StardewModdingAPI.Framework.Events
     internal class EventManager
     {
         /*********
-        ** Events (new)
+        ** Events
         *********/
         /****
         ** Display
@@ -109,8 +109,11 @@ namespace StardewModdingAPI.Framework.Events
         /****
         ** Multiplayer
         ****/
-        /// <summary>Raised after the mod context for a peer is received. This happens before the game approves the connection, so the player doesn't yet exist in the game. This is the earliest point where messages can be sent to the peer via SMAPI.</summary>
+        /// <summary>Raised after the mod context for a peer is received. This happens before the game approves the connection (<see cref="IMultiplayerEvents.PeerConnected"/>), so the player doesn't yet exist in the game. This is the earliest point where messages can be sent to the peer via SMAPI.</summary>
         public readonly ManagedEvent<PeerContextReceivedEventArgs> PeerContextReceived;
+
+        /// <summary>Raised after a peer connection is approved by the game.</summary>
+        public readonly ManagedEvent<PeerConnectedEventArgs> PeerConnected;
 
         /// <summary>Raised after a mod message is received over the network.</summary>
         public readonly ManagedEvent<ModMessageReceivedEventArgs> ModMessageReceived;
@@ -174,15 +177,14 @@ namespace StardewModdingAPI.Framework.Events
         ** Public methods
         *********/
         /// <summary>Construct an instance.</summary>
-        /// <param name="monitor">Writes messages to the log.</param>
         /// <param name="modRegistry">The mod registry with which to identify mods.</param>
         /// <param name="performanceMonitor">Tracks performance metrics.</param>
-        public EventManager(IMonitor monitor, ModRegistry modRegistry, PerformanceMonitor performanceMonitor)
+        public EventManager(ModRegistry modRegistry, PerformanceMonitor performanceMonitor)
         {
             // create shortcut initializers
             ManagedEvent<TEventArgs> ManageEventOf<TEventArgs>(string typeName, string eventName, bool isPerformanceCritical = false)
             {
-                return new ManagedEvent<TEventArgs>($"{typeName}.{eventName}", monitor, modRegistry, performanceMonitor, isPerformanceCritical);
+                return new ManagedEvent<TEventArgs>($"{typeName}.{eventName}", modRegistry, performanceMonitor, isPerformanceCritical);
             }
 
             // init events (new)
@@ -218,6 +220,7 @@ namespace StardewModdingAPI.Framework.Events
             this.MouseWheelScrolled = ManageEventOf<MouseWheelScrolledEventArgs>(nameof(IModEvents.Input), nameof(IInputEvents.MouseWheelScrolled));
 
             this.PeerContextReceived = ManageEventOf<PeerContextReceivedEventArgs>(nameof(IModEvents.Multiplayer), nameof(IMultiplayerEvents.PeerContextReceived));
+            this.PeerConnected = ManageEventOf<PeerConnectedEventArgs>(nameof(IModEvents.Multiplayer), nameof(IMultiplayerEvents.PeerConnected));
             this.ModMessageReceived = ManageEventOf<ModMessageReceivedEventArgs>(nameof(IModEvents.Multiplayer), nameof(IMultiplayerEvents.ModMessageReceived));
             this.PeerDisconnected = ManageEventOf<PeerDisconnectedEventArgs>(nameof(IModEvents.Multiplayer), nameof(IMultiplayerEvents.PeerDisconnected));
 

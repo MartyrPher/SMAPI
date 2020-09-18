@@ -1,7 +1,12 @@
 using System;
-using Android.OS;
-using Harmony;
+#if HARMONY_2
+using HarmonyLib;
+#else
+#if SMAPI_FOR_MOBILE
 using MonoMod.RuntimeDetour;
+#endif
+using Harmony;
+#endif
 
 namespace StardewModdingAPI.Framework.Patching
 {
@@ -29,11 +34,35 @@ namespace StardewModdingAPI.Framework.Patching
         /// <param name="patches">The patches to apply.</param>
         public void Apply(params IHarmonyPatch[] patches)
         {
-            HarmonyDetourBridge.Init();
-
-            HarmonyInstance harmony = HarmonyInstance.Create("io.smapi");
+#if HARMONY_2
+            Harmony harmony = new Harmony("SMAPI");
+#else
+#if SMAPI_FOR_MOBILE
+            if (!HarmonyDetourBridge.Initialized && Constants.HarmonyEnabled)
+            {
+                try {
+                    HarmonyDetourBridge.Init();
+                }
+                catch { Constants.HarmonyEnabled = false; }
+            }
+#endif
+            HarmonyInstance harmony = HarmonyInstance.Create("SMAPI");
+#endif
             foreach (IHarmonyPatch patch in patches)
             {
+#if SMAPI_FOR_MOBILE
+                try
+                {
+                    if(Constants.HarmonyEnabled)
+                        patch.Apply(harmony);
+                }
+                catch (Exception ex)
+                {
+                    Constants.HarmonyEnabled = false;
+                    this.Monitor.Log($"Couldn't apply runtime patch '{patch.Name}' to the game. Some SMAPI features may not work correctly. See log file for details.", LogLevel.Error);
+                    this.Monitor.Log(ex.GetLogSummary(), LogLevel.Trace);
+                }
+#else
                 try
                 {
                     patch.Apply(harmony);
@@ -43,12 +72,8 @@ namespace StardewModdingAPI.Framework.Patching
                     this.Monitor.Log($"Couldn't apply runtime patch '{patch.Name}' to the game. Some SMAPI features may not work correctly. See log file for details.", LogLevel.Error);
                     this.Monitor.Log(ex.GetLogSummary(), LogLevel.Trace);
                 }
+#endif
             }
-
-            //Keeping for reference
-            //if (Build.VERSION.SdkInt > BuildVersionCodes.LollipopMr1)
-            //{
-            //}
         }
     }
 }

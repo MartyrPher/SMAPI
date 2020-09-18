@@ -5,11 +5,58 @@ using System.Reflection;
 using StardewModdingAPI.Enums;
 using StardewModdingAPI.Framework;
 using StardewModdingAPI.Framework.ModLoading;
+using StardewModdingAPI.Toolkit.Framework;
 using StardewModdingAPI.Toolkit.Utilities;
 using StardewValley;
-
+#if HARMONY_2
+using HarmonyLib;
+#else
+using Harmony;
+#endif
 namespace StardewModdingAPI
 {
+    /// <summary>Contains constants that are accessed before the game itself has been loaded.</summary>
+    /// <remarks>Most code should use <see cref="Constants"/> instead of this class directly.</remarks>
+    internal static class EarlyConstants
+    {
+        //
+        // Note: this class *must not* depend on any external DLL beyond .NET Framework itself.
+        // That includes the game or SMAPI toolkit, since it's accessed before those are loaded.
+        //
+        // Adding an external dependency may seem to work in some cases, but will prevent SMAPI
+        // from showing a human-readable error if the game isn't available. To test this, just
+        // rename "Stardew Valley.exe" in the game folder; you should see an error like "Oops!
+        // SMAPI can't find the game", not a technical exception.
+        //
+
+        /*********
+        ** Accessors
+        *********/
+        /// <summary>The path to the game folder.</summary>
+#if SMAPI_FOR_MOBILE
+        public static string ExecutionPath { get; } = Path.Combine(Android.OS.Environment.ExternalStorageDirectory.Path, "StardewValley/smapi-internal");
+#else
+        public static string ExecutionPath { get; } = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+#endif
+
+        /// <summary>The absolute path to the folder containing SMAPI's internal files.</summary>
+#if SMAPI_FOR_MOBILE
+        public static readonly string InternalFilesPath = EarlyConstants.ExecutionPath;
+#else
+        public static readonly string InternalFilesPath = Path.Combine(EarlyConstants.ExecutionPath, "smapi-internal");
+#endif
+
+        /// <summary>The target game platform.</summary>
+#if SMAPI_FOR_MOBILE
+        internal static GamePlatform Platform { get; } = (GamePlatform)Enum.Parse(typeof(GamePlatform), LowLevelEnvironmentUtility.DetectPlatform());
+#else
+        internal static GamePlatform Platform { get; } = (GamePlatform)Enum.Parse(typeof(GamePlatform), LowLevelEnvironmentUtility.DetectPlatform());
+#endif
+
+        /// <summary>The game's assembly name.</summary>
+        internal static string GameAssemblyName => EarlyConstants.Platform == GamePlatform.Windows ? "Stardew Valley" : "StardewValley";
+    }
+
     /// <summary>Contains SMAPI's constants and assumptions.</summary>
     public static class Constants
     {
@@ -20,28 +67,38 @@ namespace StardewModdingAPI
         ** Public
         ****/
         /// <summary>SMAPI's current semantic version.</summary>
-        public static ISemanticVersion ApiVersion { get; } = new Toolkit.SemanticVersion("3.2.0.4", allowNonStandard: true);
+#if SMAPI_FOR_MOBILE
+        public static ISemanticVersion ApiVersion { get; } = new Toolkit.SemanticVersion("3.6.2.1", true);
+#else
+        public static ISemanticVersion ApiVersion { get; } = new Toolkit.SemanticVersion("3.6.2");
+#endif
 
         /// <summary>The minimum supported version of Stardew Valley.</summary>
-        public static ISemanticVersion MinimumGameVersion { get; } = new GameVersion("1.4.1");
+        public static ISemanticVersion MinimumGameVersion { get; } = new GameVersion("1.4.5");
 
         /// <summary>The maximum supported version of Stardew Valley.</summary>
         public static ISemanticVersion MaximumGameVersion { get; } = null;
 
         /// <summary>The target game platform.</summary>
-        public static GamePlatform TargetPlatform => GamePlatform.Android;
+        public static GamePlatform TargetPlatform { get; } = EarlyConstants.Platform;
 
         /// <summary>The path to the game folder.</summary>
-        public static string ExecutionPath { get; } = Path.Combine(Android.OS.Environment.ExternalStorageDirectory.Path, "StardewValley/smapi-internal");
+        public static string ExecutionPath { get; } = EarlyConstants.ExecutionPath;
 
         /// <summary>The directory path containing Stardew Valley's app data.</summary>
+#if SMAPI_FOR_MOBILE
         public static string DataPath { get; } = Path.Combine(Android.OS.Environment.ExternalStorageDirectory.Path, "StardewValley");
-
+#else
+        public static string DataPath { get; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "StardewValley");
+#endif
         /// <summary>The directory path in which error logs should be stored.</summary>
         public static string LogDir { get; } = Path.Combine(Constants.DataPath, "ErrorLogs");
-
         /// <summary>The directory path where all saves are stored.</summary>
+#if SMAPI_FOR_MOBILE
         public static string SavesPath { get; } = Constants.DataPath;
+#else
+        public static string SavesPath { get; } = Path.Combine(Constants.DataPath, "Saves");
+#endif
 
         /// <summary>The name of the current save folder (if save info is available, regardless of whether the save file exists yet).</summary>
         public static string SaveFolderName => Constants.GetSaveFolderName();
@@ -52,14 +109,22 @@ namespace StardewModdingAPI
         /****
         ** Internal
         ****/
+        /// <summary>Whether SMAPI was compiled in debug mode.</summary>
+        internal const bool IsDebugBuild =
+#if DEBUG
+            true;
+#else
+            false;
+#endif
+
         /// <summary>The URL of the SMAPI home page.</summary>
-        internal const string HomePageUrl = "https://github.com/MartyrPher/SMAPI-Android-Installer/releases/latest";
+        internal const string HomePageUrl = "https://smapi.io";
 
         /// <summary>The default performance counter name for unknown event handlers.</summary>
         internal const string GamePerformanceCounterName = "<StardewValley>";
 
         /// <summary>The absolute path to the folder containing SMAPI's internal files.</summary>
-        internal static readonly string InternalFilesPath = Program.DllSearchPath;
+        internal static readonly string InternalFilesPath = EarlyConstants.InternalFilesPath;
 
         /// <summary>The file path for the SMAPI configuration file.</summary>
         internal static string ApiConfigPath => Path.Combine(Constants.InternalFilesPath, "config.json");
@@ -95,16 +160,20 @@ namespace StardewModdingAPI
         internal static string ModsPath { get; set; }
 
         /// <summary>The game's current semantic version.</summary>
-        internal static ISemanticVersion GameVersion { get; } = new GameVersion("1.4.5.139");
+        internal static ISemanticVersion GameVersion { get; } = new GameVersion(Game1.version);
 
-        /// <summary>The target game platform.</summary>
-        internal static Platform Platform { get; } = Platform.Android;
-
-        /// <summary>The game's assembly name.</summary>
-        internal static string GameAssemblyName => Constants.Platform == Platform.Windows ? "Stardew Valley" : "StardewValley";
+        /// <summary>The target game platform as a SMAPI toolkit constant.</summary>
+        internal static Platform Platform { get; } = (Platform)Constants.TargetPlatform;
 
         /// <summary>The language code for non-translated mod assets.</summary>
         internal static LocalizedContentManager.LanguageCode DefaultLanguage { get; } = LocalizedContentManager.LanguageCode.en;
+
+#if SMAPI_FOR_MOBILE
+        /// <summary>The app secret from AppCenter.</summary>
+        internal static readonly string MicrosoftAppSecret = "79411636-0bc5-41cc-9889-43a4bca83b9d";
+
+        internal static bool HarmonyEnabled { get; set; } = true;
+#endif
 
 
         /*********
@@ -115,26 +184,59 @@ namespace StardewModdingAPI
         /// <returns>Returns the compatible SMAPI version, or <c>null</c> if none was found.</returns>
         internal static ISemanticVersion GetCompatibleApiVersion(ISemanticVersion version)
         {
+            // This covers all officially supported public game updates. It might seem like version
+            // ranges would be better, but the given SMAPI versions may not be compatible with
+            // intermediate unlisted versions (e.g. private beta updates).
+            //
+            // Nonstandard versions are normalized by GameVersion (e.g. 1.07 => 1.0.7).
             switch (version.ToString())
             {
-                case "1.3.36":
-                    return new SemanticVersion(2, 11, 2);
+                case "1.4.1":
+                case "1.4.0":
+                    return new SemanticVersion("3.0.1");
 
-                case "1.3.32":
+                case "1.3.36":
+                    return new SemanticVersion("2.11.2");
+
                 case "1.3.33":
-                    return new SemanticVersion(2, 10, 2);
+                case "1.3.32":
+                    return new SemanticVersion("2.10.2");
 
                 case "1.3.28":
-                    return new SemanticVersion(2, 7, 0);
+                    return new SemanticVersion("2.7.0");
 
-                case "1.2.30":
-                case "1.2.31":
-                case "1.2.32":
                 case "1.2.33":
-                    return new SemanticVersion(2, 5, 5);
-            }
+                case "1.2.32":
+                case "1.2.31":
+                case "1.2.30":
+                    return new SemanticVersion("2.5.5");
 
-            return null;
+                case "1.2.29":
+                case "1.2.28":
+                case "1.2.27":
+                case "1.2.26":
+                    return new SemanticVersion("1.13.1");
+
+                case "1.1.1":
+                case "1.1.0":
+                    return new SemanticVersion("1.9.0");
+
+                case "1.0.7.1":
+                case "1.0.7":
+                case "1.0.6":
+                case "1.0.5.2":
+                case "1.0.5.1":
+                case "1.0.5":
+                case "1.0.4":
+                case "1.0.3":
+                case "1.0.2":
+                case "1.0.1":
+                case "1.0.0":
+                    return new SemanticVersion("0.40.0");
+
+                default:
+                    return null;
+            }
         }
 
         /// <summary>Get metadata for mapping assemblies to the current platform.</summary>
@@ -163,10 +265,14 @@ namespace StardewModdingAPI
                     {
                         typeof(StardewValley.Game1).Assembly, // note: includes Netcode types on Linux/Mac
                         typeof(Microsoft.Xna.Framework.Vector2).Assembly,
-                        typeof(MonoMod.RuntimeDetour.HarmonyDetourBridge).Assembly,
-                        typeof(MonoMod.Utils.Platform).Assembly,
-                        typeof(Harmony.HarmonyPatch).Assembly,
+#if __REMOVE_TEST__
+#if HARMONY_2
+                        typeof(HarmonyLib.Harmony).Assembly,
+#else
+                        typeof(Harmony.HarmonyInstance).Assembly,
+#endif
                         typeof(Mono.Cecil.MethodDefinition).Assembly,
+#endif
                         typeof(StardewModdingAPI.IManifest).Assembly,
                     };
                     break;

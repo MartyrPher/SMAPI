@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
+using StardewModdingAPI.Framework.Content;
 using StardewModdingAPI.Framework.ContentManagers;
 using StardewModdingAPI.Framework.Exceptions;
 using StardewValley;
@@ -32,7 +33,7 @@ namespace StardewModdingAPI.Framework.ModHelpers
         /// <summary>The friendly mod name for use in errors.</summary>
         private readonly string ModName;
 
-        /// <summary>Encapsulates monitoring and logging for a given module.</summary>
+        /// <summary>Encapsulates monitoring and logging.</summary>
         private readonly IMonitor Monitor;
 
 
@@ -70,9 +71,11 @@ namespace StardewModdingAPI.Framework.ModHelpers
         public ContentHelper(ContentCoordinator contentCore, string modFolderPath, string modID, string modName, IMonitor monitor)
             : base(modID)
         {
+            string managedAssetPrefix = contentCore.GetManagedAssetPrefix(modID);
+
             this.ContentCore = contentCore;
-            this.GameContentManager = contentCore.CreateGameContentManager(this.ContentCore.GetManagedAssetPrefix(modID) + ".content");
-            this.ModContentManager = contentCore.CreateModContentManager(this.ContentCore.GetManagedAssetPrefix(modID), modFolderPath, this.GameContentManager);
+            this.GameContentManager = contentCore.CreateGameContentManager(managedAssetPrefix + ".content");
+            this.ModContentManager = contentCore.CreateModContentManager(managedAssetPrefix, modName, modFolderPath, this.GameContentManager);
             this.ModName = modName;
             this.Monitor = monitor;
         }
@@ -160,6 +163,19 @@ namespace StardewModdingAPI.Framework.ModHelpers
         {
             this.Monitor.Log("Requested cache invalidation for all assets matching a predicate.", LogLevel.Trace);
             return this.ContentCore.InvalidateCache(predicate).Any();
+        }
+
+        /// <summary>Get a patch helper for arbitrary data.</summary>
+        /// <typeparam name="T">The data type.</typeparam>
+        /// <param name="data">The asset data.</param>
+        /// <param name="assetName">The asset name. This is only used for tracking purposes and has no effect on the patch helper.</param>
+        public IAssetData GetPatchHelper<T>(T data, string assetName = null)
+        {
+            if (data == null)
+                throw new ArgumentNullException(nameof(data), "Can't get a patch helper for a null value.");
+
+            assetName ??= $"temp/{Guid.NewGuid():N}";
+            return new AssetDataForObject(this.CurrentLocale, assetName, data, this.NormalizeAssetName);
         }
 
 

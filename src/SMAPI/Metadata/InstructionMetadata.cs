@@ -1,11 +1,16 @@
 using System.Collections.Generic;
+#if HARMONY_2
+using HarmonyLib;
+#else
+using Harmony;
+#endif
 using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
 using StardewModdingAPI.Events;
 using StardewModdingAPI.Framework.ModLoading;
 using StardewModdingAPI.Framework.ModLoading.Finders;
+using StardewModdingAPI.Framework.ModLoading.RewriteFacades;
 using StardewModdingAPI.Framework.ModLoading.Rewriters;
-using StardewModdingAPI.Framework.RewriteFacades;
 using StardewValley;
 using StardewValley.BellsAndWhistles;
 using StardewValley.Menus;
@@ -35,26 +40,26 @@ namespace StardewModdingAPI.Metadata
         *********/
         /// <summary>Get rewriters which detect or fix incompatible CIL instructions in mod assemblies.</summary>
         /// <param name="paranoidMode">Whether to detect paranoid mode issues.</param>
-        public IEnumerable<IInstructionHandler> GetHandlers(bool paranoidMode)
+        /// <param name="platformChanged">Whether the assembly was rewritten for crossplatform compatibility.</param>
+        public IEnumerable<IInstructionHandler> GetHandlers(bool paranoidMode, bool platformChanged)
         {
             /****
             ** rewrite CIL to fix incompatible code
             ****/
             // rewrite for crossplatform compatibility
-            yield return new MethodParentRewriter(typeof(SpriteBatch), typeof(SpriteBatchMethods), onlyIfPlatformChanged: true);
+            if (platformChanged)
+                yield return new MethodParentRewriter(typeof(SpriteBatch), typeof(SpriteBatchFacade));
 
-            //isRaining and isDebrisWeather fix done.
+#if SMAPI_FOR_MOBILE
+            // Redirect reference
             yield return new TypeFieldToAnotherTypePropertyRewriter(typeof(Game1), typeof(Game1Methods), "isRaining", "IsRainingProp");
             yield return new TypeFieldToAnotherTypePropertyRewriter(typeof(Game1), typeof(Game1Methods), "isSnowing", "IsSnowingProp");
             yield return new TypeFieldToAnotherTypePropertyRewriter(typeof(Game1), typeof(Game1Methods), "isDebrisWeather", "IsDebrisWeatherProp");
-
-            // Cause of System.Security.VerificationException : Invalid instruction target
-            //yield return new TypeFieldToAnotherTypeFieldRewriter(typeof(Game1), typeof(RainManager), "isRaining", "Instance", this.Monitor);
-            //yield return new TypeFieldToAnotherTypeFieldRewriter(typeof(Game1), typeof(WeatherDebrisManager), "isDebrisWeather", "Instance", this.Monitor);
-            yield return new TypeFieldToAnotherTypeFieldRewriter(typeof(GameLocation), typeof(DebrisManager), "debris", "Instance", this.Monitor, "debrisNetCollection", false);
-            yield return new TypeFieldToAnotherTypeFieldRewriter(typeof(Game1), typeof(WeatherDebrisManager), "debrisWeather", "Instance", this.Monitor, "weatherDebrisList");
-            yield return new TypeFieldToAnotherTypeFieldRewriter(typeof(Game1), typeof(Game1Methods), "rainDrops", "Instance", this.Monitor, null, false, true);
-            yield return new TypeFieldToAnotherTypeFieldRewriter(typeof(Game1), typeof(Game1Methods), "onScreenMenus", "", this.Monitor, null, false, true);
+            yield return new TypeFieldToAnotherTypePropertyRewriter(typeof(Game1), typeof(Game1Methods), "rainDrops", "RainDropsProp");
+            yield return new TypeFieldToAnotherTypeFieldRewriter(typeof(GameLocation), typeof(DebrisManager), "debris", this.Monitor, "debrisNetCollection");
+            // yield return new TypeFieldToAnotherTypePropertyRewriter(typeof(GameLocation), typeof(DebrisManager), "debris", "debrisNetCollection", "Instance");
+            yield return new TypeFieldToAnotherTypePropertyRewriter(typeof(Game1), typeof(WeatherDebrisManager), "debrisWeather","weatherDebrisList", "Instance");
+            yield return new TypeFieldToAnotherTypePropertyRewriter(typeof(Game1), typeof(Game1Methods), "onScreenMenus", "onScreenMenus");
 
             yield return new PropertyToFieldRewriter(typeof(Game1), "toolSpriteSheet", "toolSpriteSheet");
 
@@ -72,6 +77,8 @@ namespace StardewModdingAPI.Metadata
             yield return new TypeFieldToAnotherTypePropertyRewriter(typeof(AnimalQueryMenu), typeof(AnimalQueryMenuMethods), "allowReproductionButton", "AllowReproductionButtonProp");
             yield return new TypeFieldToAnotherTypePropertyRewriter(typeof(AnimalQueryMenu), typeof(AnimalQueryMenuMethods), "sellButton", "SellButtonProp");
             yield return new TypeFieldToAnotherTypePropertyRewriter(typeof(AnimalQueryMenu), typeof(AnimalQueryMenuMethods), "moveHomeButton", "MoveHomeButtonProp");
+            // TextBox fix
+            yield return new TypePropertyToAnotherTypeMethodRewriter(typeof(TextBox), typeof(TextBoxMethods), "Selected", null, "SelectedSetter");
 
             // Rewrite Missing Type
             yield return new TypeReferenceRewriter("StardewValley.Menus.CraftingPage", typeof(CraftingPageMobile));
@@ -79,41 +86,51 @@ namespace StardewModdingAPI.Metadata
 
             //Method Rewrites
             yield return new MethodParentRewriter(typeof(Game1), typeof(Game1Methods));
-            yield return new MethodParentRewriter(typeof(Farmer), typeof(FarmerMethods));
             yield return new MethodParentRewriter(typeof(IClickableMenu), typeof(IClickableMenuMethods));
-            yield return new MethodParentRewriter(typeof(FarmerRenderer), typeof(FarmerRendererMethods));
             yield return new MethodParentRewriter(typeof(SpriteText), typeof(SpriteTextMethods));
             yield return new MethodParentRewriter(typeof(NPC), typeof(NPCMethods));
             yield return new MethodParentRewriter(typeof(Utility), typeof(UtilityMethods));
             yield return new MethodParentRewriter(typeof(DayTimeMoneyBox), typeof(DayTimeMoneyBoxMethods));
+            yield return new MethodParentRewriter(typeof(SaveGame), typeof(SaveGameMethods));
 
             //Constructor Rewrites
-            yield return new MethodParentRewriter(typeof(HUDMessage), typeof(HUDMessageMethods));
-            yield return new MethodParentRewriter(typeof(MapPage), typeof(MapPageMethods));
-            yield return new MethodParentRewriter(typeof(TextBox), typeof(TextBoxMethods));
             yield return new MethodParentRewriter(typeof(ItemGrabMenu), typeof(ItemGrabMenuMethods));
             yield return new MethodParentRewriter(typeof(WeatherDebris), typeof(WeatherDebrisMethods));
             yield return new MethodParentRewriter(typeof(Debris), typeof(DebrisMethods));
-            yield return new MethodParentRewriter(typeof(DiscreteColorPicker), typeof(DiscreteColorPickerMethods));
             yield return new MethodParentRewriter(typeof(InventoryMenu), typeof(InventoryMenuMethods));
             yield return new MethodParentRewriter(typeof(MenuWithInventory), typeof(MenuWithInventoryMethods));
             yield return new MethodParentRewriter(typeof(GameMenu), typeof(GameMenuMethods));
             yield return new MethodParentRewriter(typeof(CraftingPageMobile), typeof(CraftingPageMobileMethods));
-            yield return new MethodParentRewriter(typeof(DialogueBox), typeof(DialogueBoxMethods));
 
             //Field Rewriters
             yield return new FieldReplaceRewriter(typeof(ItemGrabMenu), "context", "specialObject");
 
-            // rewrite for Stardew Valley 1.3
-            yield return new StaticFieldToConstantRewriter<int>(typeof(Game1), "tileSize", Game1.tileSize);
-            yield return new FieldToPropertyRewriter(typeof(Game1), "player");
-            yield return new FieldToPropertyRewriter(typeof(Game1), "currentLocation");
-            yield return new FieldToPropertyRewriter(typeof(Character), "currentLocation");
-            yield return new FieldToPropertyRewriter(typeof(Farmer), "currentLocation");
-            yield return new FieldToPropertyRewriter(typeof(Game1), "gameMode");
-            yield return new FieldToPropertyRewriter(typeof(Game1), "currentMinigame");
-            yield return new FieldToPropertyRewriter(typeof(Game1), "activeClickableMenu");
-            yield return new FieldToPropertyRewriter(typeof(Game1), "stats");
+#endif
+
+            // heuristic rewrites
+            yield return new HeuristicFieldRewriter(this.ValidateReferencesToAssemblies);
+            yield return new HeuristicMethodRewriter(this.ValidateReferencesToAssemblies);
+
+#if HARMONY_2
+            // rewrite for SMAPI 3.6 (Harmony 1.x => 2.0 update)
+            yield return new Harmony1AssemblyRewriter();
+#endif
+
+#if SMAPI_FOR_MOBILE
+            // MonoMod fix
+            if (!Constants.HarmonyEnabled)
+            {
+#if HARMONY_2
+                yield return new MethodToAnotherStaticMethodRewriter(typeof(Harmony), (method) => method.Name == "Patch", typeof(HarmonyInstanceMethods), "Patch");
+                yield return new MethodToAnotherStaticMethodRewriter(typeof(Harmony), (method) => method.Name == "PatchAll" && method.Parameters.Count == 0, typeof(HarmonyInstanceMethods), "PatchAll");
+                yield return new MethodToAnotherStaticMethodRewriter(typeof(Harmony), (method) => method.Name == "PatchAll" && method.Parameters.Count == 1, typeof(HarmonyInstanceMethods), "PatchAllToAssembly");
+#else
+                yield return new MethodToAnotherStaticMethodRewriter(typeof(HarmonyInstance), (method) => method.Name == "Patch", typeof(HarmonyInstanceMethods), "Patch");
+                yield return new MethodToAnotherStaticMethodRewriter(typeof(HarmonyInstance), (method) => method.Name == "PatchAll" && method.Parameters.Count == 0, typeof(HarmonyInstanceMethods), "PatchAll");
+                yield return new MethodToAnotherStaticMethodRewriter(typeof(HarmonyInstance), (method) => method.Name == "PatchAll" && method.Parameters.Count == 1, typeof(HarmonyInstanceMethods), "PatchAllToAssembly");
+#endif
+            }
+#endif
 
             /****
             ** detect mod issues
@@ -125,7 +142,11 @@ namespace StardewModdingAPI.Metadata
             /****
             ** detect code which may impact game stability
             ****/
-            yield return new TypeFinder("Harmony.HarmonyInstance", InstructionHandleResult.DetectedGamePatch);
+#if HARMONY_2
+            yield return new TypeFinder(typeof(HarmonyLib.Harmony).FullName, InstructionHandleResult.DetectedGamePatch);
+#else
+            yield return new TypeFinder(typeof(Harmony.HarmonyInstance).FullName, InstructionHandleResult.DetectedGamePatch);
+#endif
             yield return new TypeFinder("System.Runtime.CompilerServices.CallSite", InstructionHandleResult.DetectedDynamic);
             yield return new FieldFinder(typeof(SaveGame).FullName, nameof(SaveGame.serializer), InstructionHandleResult.DetectedSaveSerializer);
             yield return new FieldFinder(typeof(SaveGame).FullName, nameof(SaveGame.farmerSerializer), InstructionHandleResult.DetectedSaveSerializer);

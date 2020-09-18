@@ -30,7 +30,7 @@ namespace StardewModdingAPI.Toolkit.Framework.GameScanning
                 .GetCustomInstallPaths(platform)
                 .Concat(this.GetDefaultInstallPaths(platform))
                 .Select(PathUtilities.NormalizePathSeparators)
-                .Distinct(StringComparer.InvariantCultureIgnoreCase);
+                .Distinct(StringComparer.OrdinalIgnoreCase);
 
             // yield valid folders
             foreach (string path in paths)
@@ -124,8 +124,8 @@ namespace StardewModdingAPI.Toolkit.Framework.GameScanning
             XElement root;
             try
             {
-                using (FileStream stream = file.OpenRead())
-                    root = XElement.Load(stream);
+                using FileStream stream = file.OpenRead();
+                root = XElement.Load(stream);
             }
             catch
             {

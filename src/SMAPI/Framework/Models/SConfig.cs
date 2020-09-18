@@ -15,21 +15,19 @@ namespace StardewModdingAPI.Framework.Models
         private static readonly IDictionary<string, object> DefaultValues = new Dictionary<string, object>
         {
             [nameof(CheckForUpdates)] = true,
-            [nameof(ParanoidWarnings)] =
-#if DEBUG
-                true,
-#else
-                false,
-#endif
+            [nameof(ParanoidWarnings)] = Constants.IsDebugBuild,
             [nameof(UseBetaChannel)] = Constants.ApiVersion.IsPrerelease(),
             [nameof(GitHubProjectName)] = "MartyrPher/SMAPI-Android-Installer",
             [nameof(WebApiBaseUrl)] = "https://smapi.io/api/",
             [nameof(VerboseLogging)] = false,
-            [nameof(LogNetworkTraffic)] = false
+            [nameof(LogNetworkTraffic)] = false,
+            [nameof(ModsPath)] = "StardewValley/Mods",
+            [nameof(DisableMonoMod)] = false,
+            [nameof(MaxLogSize)] = int.MaxValue
         };
 
         /// <summary>The default values for <see cref="SuppressUpdateChecks"/>, to log changes if different.</summary>
-        private static readonly HashSet<string> DefaultSuppressUpdateChecks = new HashSet<string>(StringComparer.InvariantCultureIgnoreCase)
+        private static readonly HashSet<string> DefaultSuppressUpdateChecks = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "SMAPI.ConsoleCommands",
             "SMAPI.SaveBackup"
@@ -69,6 +67,11 @@ namespace StardewModdingAPI.Framework.Models
         /// <summary>The mod IDs SMAPI should ignore when performing update checks or validating update keys.</summary>
         public string[] SuppressUpdateChecks { get; set; }
 
+        public string ModsPath { get; set; }
+
+        public bool DisableMonoMod { get; set; }
+
+        public int MaxLogSize { get; set; } = int.MaxValue;
 
         /********
         ** Public methods
@@ -85,7 +88,7 @@ namespace StardewModdingAPI.Framework.Models
                     custom[pair.Key] = value;
             }
 
-            HashSet<string> curSuppressUpdateChecks = new HashSet<string>(this.SuppressUpdateChecks ?? new string[0], StringComparer.InvariantCultureIgnoreCase);
+            HashSet<string> curSuppressUpdateChecks = new HashSet<string>(this.SuppressUpdateChecks ?? new string[0], StringComparer.OrdinalIgnoreCase);
             if (SConfig.DefaultSuppressUpdateChecks.Count != curSuppressUpdateChecks.Count || SConfig.DefaultSuppressUpdateChecks.Any(p => !curSuppressUpdateChecks.Contains(p)))
                 custom[nameof(this.SuppressUpdateChecks)] = "[" + string.Join(", ", this.SuppressUpdateChecks ?? new string[0]) + "]";
 

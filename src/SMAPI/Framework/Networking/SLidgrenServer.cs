@@ -1,3 +1,4 @@
+#if !SMAPI_FOR_MOBILE
 using System;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
@@ -44,26 +45,26 @@ namespace StardewModdingAPI.Framework.Networking
         {
             // add hook to call multiplayer core
             NetConnection peer = rawMessage.SenderConnection;
-            using (IncomingMessage message = new IncomingMessage())
-            using (Stream readStream = new NetBufferReadStream(rawMessage))
-            using (BinaryReader reader = new BinaryReader(readStream))
+            using IncomingMessage message = new IncomingMessage();
+            using Stream readStream = new NetBufferReadStream(rawMessage);
+            using BinaryReader reader = new BinaryReader(readStream);
+
+            while (rawMessage.LengthBits - rawMessage.Position >= 8)
             {
-                while (rawMessage.LengthBits - rawMessage.Position >= 8)
+                message.Read(reader);
+                NetConnection connection = rawMessage.SenderConnection; // don't pass rawMessage into context because it gets reused
+                this.OnProcessingMessage(message, outgoing => this.sendMessage(connection, outgoing), () =>
                 {
-                    message.Read(reader);
-                    NetConnection connection = rawMessage.SenderConnection; // don't pass rawMessage into context because it gets reused
-                    this.OnProcessingMessage(message, outgoing => this.sendMessage(connection, outgoing), () =>
+                    if (this.peers.ContainsLeft(message.FarmerID) && this.peers[message.FarmerID] == peer)
+                        this.gameServer.processIncomingMessage(message);
+                    else if (message.MessageType == StardewValley.Multiplayer.playerIntroduction)
                     {
-                        if (this.peers.ContainsLeft(message.FarmerID) && this.peers[message.FarmerID] == peer)
-                            this.gameServer.processIncomingMessage(message);
-                        else if (message.MessageType == StardewValley.Multiplayer.playerIntroduction)
-                        {
-                            NetFarmerRoot farmer = this.Multiplayer.readFarmer(message.Reader);
-                            this.gameServer.checkFarmhandRequest("", this.getConnectionId(rawMessage.SenderConnection), farmer, msg => this.sendMessage(peer, msg), () => this.peers[farmer.Value.UniqueMultiplayerID] = peer);
-                        }
-                    });
-                }
+                        NetFarmerRoot farmer = this.Multiplayer.readFarmer(message.Reader);
+                        this.gameServer.checkFarmhandRequest("", this.getConnectionId(rawMessage.SenderConnection), farmer, msg => this.sendMessage(peer, msg), () => this.peers[farmer.Value.UniqueMultiplayerID] = peer);
+                    }
+                });
             }
         }
     }
 }
+#endif

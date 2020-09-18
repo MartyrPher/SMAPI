@@ -1,17 +1,8 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-
-using Android.App;
-using Android.Content;
-using Android.OS;
-using Android.Runtime;
-using Android.Views;
-using Android.Widget;
 using Mono.Cecil;
 using Mono.Cecil.Cil;
 using StardewModdingAPI.Framework.ModLoading.Finders;
+using StardewModdingAPI.Framework.ModLoading.Framework;
 
 namespace StardewModdingAPI.Framework.ModLoading.Rewriters
 {
@@ -44,31 +35,31 @@ namespace StardewModdingAPI.Framework.ModLoading.Rewriters
             this.PropertyName = propertyName;
             this.FieldName = fieldName;
         }
-        
+
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <param name="module"></param>
         /// <param name="cil"></param>
         /// <param name="instruction"></param>
-        /// <param name="assemblyMap"></param>
-        /// <param name="platformChanged"></param>
-        /// <returns></returns>
-        public override InstructionHandleResult Handle(ModuleDefinition module, ILProcessor cil, Instruction instruction, PlatformAssemblyMap assemblyMap, bool platformChanged)
+        /// <returns>Returns whether the instruction was changed.</returns>
+        public override bool Handle(ModuleDefinition module, ILProcessor cil, Instruction instruction)
         {
             if (!this.IsMatch(instruction))
-                return InstructionHandleResult.None;
+                return false;
             MethodReference methodRef = RewriteHelper.AsMethodReference(instruction);
             TypeReference typeRef = module.ImportReference(this.Type);
             FieldReference fieldRef = module.ImportReference(new FieldReference(this.FieldName, methodRef.ReturnType, typeRef));
             if (methodRef.Name.StartsWith("get_")) {
-                cil.Replace(instruction, cil.Create(methodRef.HasThis ? OpCodes.Ldfld : OpCodes.Ldsfld, fieldRef));
+                instruction.OpCode = methodRef.HasThis ? OpCodes.Ldfld : OpCodes.Ldsfld;
+                instruction.Operand = fieldRef;
             }
             else
             {
-                cil.Replace(instruction, cil.Create(methodRef.HasThis ? OpCodes.Stfld : OpCodes.Stsfld, fieldRef));
+                instruction.OpCode = methodRef.HasThis ? OpCodes.Stfld : OpCodes.Stsfld;
+                instruction.Operand = fieldRef;
             }
-            return InstructionHandleResult.Rewritten;
+            return this.MarkRewritten();
         }
     }
 }

@@ -37,14 +37,17 @@ copy all the settings, or you may cause bugs due to overridden changes in future
      * Whether to add a section to the 'mod issues' list for mods which directly use potentially
      * sensitive .NET APIs like file or shell access. Note that many mods do this legitimately as
      * part of their normal functionality, so these warnings are meaningless without further
-     * investigation. When this is commented out, it'll be true for local debug builds and false
-     * otherwise.
+     * investigation.
+     *
+     * When this is commented out, it'll be true for local debug builds and false otherwise.
      */
     //"ParanoidWarnings": true,
 
     /**
-     * Whether SMAPI should show newer beta versions as an available update. When this is commented
-     * out, it'll be true if the current SMAPI version is beta, and false otherwise.
+     * Whether SMAPI should show newer beta versions as an available update.
+     *
+     * When this is commented out, it'll be true if the current SMAPI version is beta, and false
+     * otherwise.
      */
     //"UseBetaChannel": true,
 
@@ -73,6 +76,7 @@ copy all the settings, or you may cause bugs due to overridden changes in future
      *    automatically on Linux or Windows.
      *  - LightBackground: use darker text colors that look better on a white or light background.
      *  - DarkBackground: use lighter text colors that look better on a black or dark background.
+     *  - None: disables all colors, so everything is written in the default terminal color.
      *
      * For available color codes, see https://docs.microsoft.com/en-us/dotnet/api/system.consolecolor.
      *

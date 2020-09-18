@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using StardewModdingAPI.Framework.Commands;
 
 namespace StardewModdingAPI.Framework
 {
@@ -12,7 +13,7 @@ namespace StardewModdingAPI.Framework
         ** Fields
         *********/
         /// <summary>The commands registered with SMAPI.</summary>
-        private readonly IDictionary<string, Command> Commands = new Dictionary<string, Command>(StringComparer.InvariantCultureIgnoreCase);
+        private readonly IDictionary<string, Command> Commands = new Dictionary<string, Command>(StringComparer.OrdinalIgnoreCase);
 
 
         /*********
@@ -27,7 +28,7 @@ namespace StardewModdingAPI.Framework
         /// <exception cref="ArgumentNullException">The <paramref name="name"/> or <paramref name="callback"/> is null or empty.</exception>
         /// <exception cref="FormatException">The <paramref name="name"/> is not a valid format.</exception>
         /// <exception cref="ArgumentException">There's already a command with that name.</exception>
-        public void Add(IModMetadata mod, string name, string documentation, Action<string, string[]> callback, bool allowNullCallback = false)
+        public CommandManager Add(IModMetadata mod, string name, string documentation, Action<string, string[]> callback, bool allowNullCallback = false)
         {
             name = this.GetNormalizedName(name);
 
@@ -45,6 +46,16 @@ namespace StardewModdingAPI.Framework
 
             // add command
             this.Commands.Add(name, new Command(mod, name, documentation, callback));
+            return this;
+        }
+
+        /// <summary>Add a console command.</summary>
+        /// <param name="command">the SMAPI console command to add.</param>
+        /// <param name="monitor">Writes messages to the console.</param>
+        /// <exception cref="ArgumentException">There's already a command with that name.</exception>
+        public CommandManager Add(IInternalCommand command, IMonitor monitor)
+        {
+            return this.Add(null, command.Name, command.Description, (name, args) => command.HandleCommand(args, monitor));
         }
 
         /// <summary>Get a command by its unique name.</summary>
@@ -108,6 +119,7 @@ namespace StardewModdingAPI.Framework
                 command.Callback.Invoke(name, arguments);
                 return true;
             }
+
             return false;
         }
 

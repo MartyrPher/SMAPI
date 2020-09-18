@@ -1,10 +1,14 @@
 using System;
+using System.Collections.Concurrent;
 using Microsoft.Xna.Framework;
 using StardewModdingAPI.Events;
 using StardewValley;
 using StardewValley.Menus;
-using static StardewModdingAPI.Mods.VirtualKeyboard.ModConfig;
 using System.Reflection;
+using Microsoft.Xna.Framework.Input;
+using static StardewModdingAPI.Mods.VirtualKeyboard.ModConfig;
+using System.Threading.Tasks;
+using Microsoft.Xna.Framework.Graphics;
 
 namespace StardewModdingAPI.Mods.VirtualKeyboard
 {
@@ -23,6 +27,7 @@ namespace StardewModdingAPI.Mods.VirtualKeyboard
         private readonly SButton buttonKey;
         private readonly float transparency;
         private readonly string alias;
+        private readonly string command;
         public bool hidden;
         private bool raisingPressed = false;
         private bool raisingReleased = false;
@@ -39,6 +44,7 @@ namespace StardewModdingAPI.Mods.VirtualKeyboard
                 this.alias = this.buttonKey.ToString();
             else
                 this.alias = buttonDefine.alias;
+            this.command = buttonDefine.command;
 
             if (buttonDefine.transparency <= 0.01f || buttonDefine.transparency > 1f)
             {
@@ -46,24 +52,24 @@ namespace StardewModdingAPI.Mods.VirtualKeyboard
             }
             this.transparency = buttonDefine.transparency;
 
-            helper.Events.Display.RenderingHud += this.OnRenderingHud;
+            helper.Events.Display.Rendered += this.OnRendered;
             helper.Events.Input.ButtonReleased += this.EventInputButtonReleased;
             helper.Events.Input.ButtonPressed += this.EventInputButtonPressed;
 
-            MainActivity activity = this.helper.Reflection.GetField<MainActivity>(typeof(MainActivity), "instance").GetValue();
-            object score = activity.GetType().GetField("core", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(activity);
+            object score = this.GetSCore(this.helper);
             object eventManager = score.GetType().GetField("EventManager", BindingFlags.Public | BindingFlags.Instance).GetValue(score);
-
-            this.buttonPressed = eventManager.GetType().GetField("ButtonPressed", BindingFlags.Public | BindingFlags.Instance).GetValue(eventManager);
-            this.buttonReleased = eventManager.GetType().GetField("ButtonReleased", BindingFlags.Public | BindingFlags.Instance).GetValue(eventManager);
-
-            this.RaiseButtonPressed = this.buttonPressed.GetType().GetMethod("Raise", BindingFlags.Public | BindingFlags.Instance);
-            this.RaiseButtonReleased = this.buttonReleased.GetType().GetMethod("Raise", BindingFlags.Public | BindingFlags.Instance);
         }
 
-        private bool shouldTrigger(Vector2 screenPixels)
+        private object GetSCore(IModHelper helper)
         {
-            if (this.buttonRectangle.Contains(screenPixels.X * Game1.options.zoomLevel, screenPixels.Y * Game1.options.zoomLevel))
+            MainActivity activity = this.helper.Reflection.GetField<MainActivity>(typeof(MainActivity), "instance").GetValue();
+            object score = activity.GetType().GetField("core", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(activity);
+            return score;
+        }
+
+        private bool shouldTrigger(Vector2 screenPixels, SButton button)
+        {
+            if (this.buttonRectangle.Contains(screenPixels.X * Game1.options.zoomLevel, screenPixels.Y * Game1.options.zoomLevel) && !this.hidden && button == SButton.MouseLeft)
             {
                 if (!this.hidden)
                     Toolbar.toolbarPressed = true;
@@ -80,21 +86,12 @@ namespace StardewModdingAPI.Mods.VirtualKeyboard
             }
 
             Vector2 screenPixels = e.Cursor.ScreenPixels;
-            if (this.shouldTrigger(screenPixels) && !this.hidden)
+            if (this.shouldTrigger(screenPixels, e.Button))
             {
-                object inputState = e.GetType().GetField("InputState", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(e);
-
-                object buttonPressedEventArgs = Activator.CreateInstance(typeof(ButtonPressedEventArgs), BindingFlags.NonPublic | BindingFlags.Instance, null, new object[] { this.buttonKey, e.Cursor, inputState }, null);
-                try
-                {
-                    this.raisingPressed = true;
-
-                    this.RaiseButtonPressed.Invoke(this.buttonPressed, new object[] { buttonPressedEventArgs });
-                }
-                finally
-                {
-                    this.raisingPressed = false;
-                }
+                object input = this.helper.Reflection.GetField<object>(typeof(Game1), "input").GetValue();
+                this.raisingPressed = true;
+                input.GetType().GetMethod("OverrideButton").Invoke(input, new object[] { this.buttonKey, true });
+                this.raisingPressed = false;
             }
         }
 
@@ -106,30 +103,74 @@ namespace StardewModdingAPI.Mods.VirtualKeyboard
             }
 
             Vector2 screenPixels = e.Cursor.ScreenPixels;
-            if (this.shouldTrigger(screenPixels))
+            if (this.shouldTrigger(screenPixels, e.Button))
             {
-                object inputState = e.GetType().GetField("InputState", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(e);
-                object buttonReleasedEventArgs = Activator.CreateInstance(typeof(ButtonReleasedEventArgs), BindingFlags.NonPublic | BindingFlags.Instance, null, new object[] { this.buttonKey, e.Cursor, inputState }, null);
-                try
+                if (this.buttonKey == SButton.RightWindows)
                 {
-                    this.raisingReleased = true;
-                    this.RaiseButtonReleased.Invoke(this.buttonReleased, new object[] { buttonReleasedEventArgs });
+                    KeyboardInput.Show("Command", "", "", false).ContinueWith<string>(delegate (Task<string> s) {
+                        string command;
+                        command = s.Result;
+                        if (command.Length > 0)
+                        {
+                            this.SendCommand(command);
+                        }
+                        return command;
+                    });
+                    return;
                 }
-                finally
+                if (this.buttonKey == SButton.RightControl)
                 {
-                    this.raisingReleased = false;
+                    SGameConsole.Instance.Show();
+                    return;
                 }
+                if (!string.IsNullOrEmpty(this.command))
+                {
+                    this.SendCommand(this.command);
+                    return;
+                }
+                object input = this.helper.Reflection.GetField<object>(typeof(Game1), "input").GetValue();
+                this.raisingReleased = true;
+                input.GetType().GetMethod("OverrideButton").Invoke(input, new object[] { this.buttonKey, false });
+                this.raisingReleased = false;
             }
+        }
+
+        private void SendCommand(string command)
+        {
+            object score = this.GetSCore(this.helper);
+            object sgame = score.GetType().GetField("GameInstance", BindingFlags.Public | BindingFlags.Instance)?.GetValue(score);
+            ConcurrentQueue<string> commandQueue = sgame.GetType().GetProperty("CommandQueue", BindingFlags.Public | BindingFlags.Instance)?.GetValue(sgame) as ConcurrentQueue<string>;
+            commandQueue?.Enqueue(command);
         }
 
         /// <summary>Raised before drawing the HUD (item toolbar, clock, etc) to the screen.</summary>
         /// <param name="sender">The event sender.</param>
         /// <param name="e">The event arguments.</param>
-        private void OnRenderingHud(object sender, EventArgs e)
+        private void OnRendered(object sender, EventArgs e)
         {
-            if (!Game1.eventUp && !this.hidden && Game1.activeClickableMenu is GameMenu == false && Game1.activeClickableMenu is ShopMenu == false && Game1.activeClickableMenu is IClickableMenu == false)
+            if (!this.hidden)
             {
-                IClickableMenu.drawButtonWithText(Game1.spriteBatch, Game1.smallFont, this.alias, this.buttonRectangle.X, this.buttonRectangle.Y, this.buttonRectangle.Width, this.buttonRectangle.Height, Color.BurlyWood * this.transparency);
+                float scale = this.transparency;
+                if (!Game1.eventUp && Game1.activeClickableMenu is GameMenu == false && Game1.activeClickableMenu is ShopMenu == false && Game1.activeClickableMenu is IClickableMenu == false)
+                {
+                    scale *= 0.5f;
+                }
+                System.Reflection.FieldInfo matrixField = Game1.spriteBatch.GetType().GetField("_matrix", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                object originMatrix = matrixField.GetValue(Game1.spriteBatch);
+                Game1.spriteBatch.End();
+                Game1.spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp, null, null, null, Microsoft.Xna.Framework.Matrix.CreateScale(1f));
+                IClickableMenu.drawTextureBoxWithIconAndText(Game1.spriteBatch, Game1.smallFont, Game1.mouseCursors, new Rectangle(0x100, 0x100, 10, 10), null, new Rectangle(0, 0, 1, 1),
+                    this.alias, this.buttonRectangle.X, this.buttonRectangle.Y, this.buttonRectangle.Width, this.buttonRectangle.Height, Color.BurlyWood * scale, 4f,
+                    true, false, true, false, false, false, false); // Remove bold to fix the text position issue
+                Game1.spriteBatch.End();
+                if(originMatrix != null)
+                {
+                    Game1.spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp, null, null, null, (Matrix)originMatrix);
+                }
+                else
+                {
+                    Game1.spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
+                }
             }
         }
     }

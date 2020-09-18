@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Threading;
 using Microsoft.Win32;
 using StardewModdingApi.Installer.Enums;
 using StardewModdingAPI.Installer.Framework;
@@ -35,8 +34,6 @@ namespace StardewModdingApi.Installer
             "SMAPI.SaveBackup",
             "SMAPI.ConsoleCommands"
         };
-
-
 
         /// <summary>Get the absolute file or folder paths to remove when uninstalling SMAPI.</summary>
         /// <param name="installDir">The folder for Stardew Valley and SMAPI.</param>
@@ -85,11 +82,12 @@ namespace StardewModdingApi.Installer
                 foreach (DirectoryInfo modDir in modsDir.EnumerateDirectories())
                     yield return Path.Combine(modDir.FullName, ".cache"); // 1.4–1.7
             }
+
             yield return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "StardewValley", "ErrorLogs"); // remove old log files
         }
 
-        /// <summary>Handles writing color-coded text to the console.</summary>
-        private ColorfulConsoleWriter ConsoleWriter;
+        /// <summary>Handles writing text to the console.</summary>
+        private IConsoleWriter ConsoleWriter;
 
 
         /*********
@@ -469,7 +467,7 @@ namespace StardewModdingApi.Installer
                             }
 
                             // find target folder
-                            ModFolder targetMod = targetMods.FirstOrDefault(p => p.Manifest?.UniqueID?.Equals(sourceMod.Manifest.UniqueID, StringComparison.InvariantCultureIgnoreCase) == true);
+                            ModFolder targetMod = targetMods.FirstOrDefault(p => p.Manifest?.UniqueID?.Equals(sourceMod.Manifest.UniqueID, StringComparison.OrdinalIgnoreCase) == true);
                             DirectoryInfo defaultTargetFolder = new DirectoryInfo(Path.Combine(paths.ModsPath, sourceMod.Directory.Name));
                             DirectoryInfo targetFolder = targetMod?.Directory ?? defaultTargetFolder;
                             this.PrintDebug(targetFolder.FullName == defaultTargetFolder.FullName
@@ -624,7 +622,7 @@ namespace StardewModdingApi.Installer
             {
                 try
                 {
-                    this.ForceDelete(Directory.Exists(path) ? new DirectoryInfo(path) : (FileSystemInfo)new FileInfo(path));
+                    FileUtilities.ForceDelete(Directory.Exists(path) ? new DirectoryInfo(path) : (FileSystemInfo)new FileInfo(path));
                     break;
                 }
                 catch (Exception ex)
@@ -665,41 +663,6 @@ namespace StardewModdingApi.Installer
             }
         }
 
-        /// <summary>Delete a file or folder regardless of file permissions, and block until deletion completes.</summary>
-        /// <param name="entry">The file or folder to reset.</param>
-        /// <remarks>This method is mirrored from <c>FileUtilities.ForceDelete</c> in the toolkit.</remarks>
-        private void ForceDelete(FileSystemInfo entry)
-        {
-            // ignore if already deleted
-            entry.Refresh();
-            if (!entry.Exists)
-                return;
-
-            // delete children
-            if (entry is DirectoryInfo folder)
-            {
-                foreach (FileSystemInfo child in folder.GetFileSystemInfos())
-                    this.ForceDelete(child);
-            }
-
-            // reset permissions & delete
-            entry.Attributes = FileAttributes.Normal;
-            entry.Delete();
-
-            // wait for deletion to finish
-            for (int i = 0; i < 10; i++)
-            {
-                entry.Refresh();
-                if (entry.Exists)
-                    Thread.Sleep(500);
-            }
-
-            // throw exception if deletion didn't happen before timeout
-            entry.Refresh();
-            if (entry.Exists)
-                throw new IOException($"Timed out trying to delete {entry.FullName}");
-        }
-
         /// <summary>Interactively ask the user to choose a value.</summary>
         /// <param name="print">A callback which prints a message to the console.</param>
         /// <param name="message">The message to print.</param>
@@ -707,7 +670,7 @@ namespace StardewModdingApi.Installer
         /// <param name="indent">The indentation to prefix to output.</param>
         private string InteractivelyChoose(string message, string[] options, string indent = "", Action<string> print = null)
         {
-            print = print ?? this.PrintInfo;
+            print ??= this.PrintInfo;
 
             while (true)
             {
@@ -844,7 +807,7 @@ namespace StardewModdingApi.Installer
                     continue; // should never happen
 
                 // delete packaged mods (newer version bundled into SMAPI)
-                if (isDir && packagedModNames.Contains(entry.Name, StringComparer.InvariantCultureIgnoreCase))
+                if (isDir && packagedModNames.Contains(entry.Name, StringComparer.OrdinalIgnoreCase))
                 {
                     this.PrintDebug($"   Deleting {entry.Name} because it's bundled into SMAPI...");
                     this.InteractivelyDelete(entry.FullName);

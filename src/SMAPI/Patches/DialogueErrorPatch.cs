@@ -1,11 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using System.Reflection;
-using Harmony;
 using StardewModdingAPI.Framework.Patching;
 using StardewModdingAPI.Framework.Reflection;
 using StardewValley;
+#if HARMONY_2
+using HarmonyLib;
+using StardewModdingAPI.Framework;
+#else
+using System.Reflection;
+using Harmony;
+#endif
 
 namespace StardewModdingAPI.Patches
 {
@@ -23,9 +28,6 @@ namespace StardewModdingAPI.Patches
 
         /// <summary>Simplifies access to private code.</summary>
         private static Reflector Reflection;
-
-        /// <summary>Whether the <see cref="NPC.CurrentDialogue"/> getter is currently being intercepted.</summary>
-        private static bool IsInterceptingCurrentDialogue;
 
 
         /*********
@@ -50,6 +52,19 @@ namespace StardewModdingAPI.Patches
 
         /// <summary>Apply the Harmony patch.</summary>
         /// <param name="harmony">The Harmony instance.</param>
+#if HARMONY_2
+        public void Apply(Harmony harmony)
+        {
+            harmony.Patch(
+                original: AccessTools.Constructor(typeof(Dialogue), new[] { typeof(string), typeof(NPC) }),
+                finalizer: new HarmonyMethod(this.GetType(), nameof(DialogueErrorPatch.Finalize_Dialogue_Constructor))
+            );
+            harmony.Patch(
+                original: AccessTools.Property(typeof(NPC), nameof(NPC.CurrentDialogue)).GetMethod,
+                finalizer: new HarmonyMethod(this.GetType(), nameof(DialogueErrorPatch.Finalize_NPC_CurrentDialogue))
+            );
+        }
+#else
         public void Apply(HarmonyInstance harmony)
         {
             harmony.Patch(
@@ -61,11 +76,53 @@ namespace StardewModdingAPI.Patches
                 prefix: new HarmonyMethod(this.GetType(), nameof(DialogueErrorPatch.Before_NPC_CurrentDialogue))
             );
         }
-
+#endif
 
         /*********
         ** Private methods
         *********/
+#if HARMONY_2
+        /// <summary>The method to call after the Dialogue constructor.</summary>
+        /// <param name="__instance">The instance being patched.</param>
+        /// <param name="masterDialogue">The dialogue being parsed.</param>
+        /// <param name="speaker">The NPC for which the dialogue is being parsed.</param>
+        /// <param name="__exception">The exception thrown by the wrapped method, if any.</param>
+        /// <returns>Returns the exception to throw, if any.</returns>
+        private static Exception Finalize_Dialogue_Constructor(Dialogue __instance, string masterDialogue, NPC speaker, Exception __exception)
+        {
+            if (__exception != null)
+            {
+                // log message
+                string name = !string.IsNullOrWhiteSpace(speaker?.Name) ? speaker.Name : null;
+                DialogueErrorPatch.MonitorForGame.Log($"Failed parsing dialogue string{(name != null ? $" for {name}" : "")}:\n{masterDialogue}\n{__exception.GetLogSummary()}", LogLevel.Error);
+
+                // set default dialogue
+                IReflectedMethod parseDialogueString = DialogueErrorPatch.Reflection.GetMethod(__instance, "parseDialogueString");
+                IReflectedMethod checkForSpecialDialogueAttributes = DialogueErrorPatch.Reflection.GetMethod(__instance, "checkForSpecialDialogueAttributes");
+                parseDialogueString.Invoke("...");
+                checkForSpecialDialogueAttributes.Invoke();
+            }
+
+            return null;
+        }
+
+        /// <summary>The method to call after <see cref="NPC.CurrentDialogue"/>.</summary>
+        /// <param name="__instance">The instance being patched.</param>
+        /// <param name="__result">The return value of the original method.</param>
+        /// <param name="__exception">The exception thrown by the wrapped method, if any.</param>
+        /// <returns>Returns the exception to throw, if any.</returns>
+        private static Exception Finalize_NPC_CurrentDialogue(NPC __instance, ref Stack<Dialogue> __result, Exception __exception)
+        {
+            if (__exception == null)
+                return null;
+
+            DialogueErrorPatch.MonitorForGame.Log($"Failed loading current dialogue for NPC {__instance.Name}:\n{__exception.GetLogSummary()}", LogLevel.Error);
+            __result = new Stack<Dialogue>();
+
+            return null;
+        }
+#else
+
         /// <summary>The method to call instead of the Dialogue constructor.</summary>
         /// <param name="__instance">The instance being patched.</param>
         /// <param name="masterDialogue">The dialogue being parsed.</param>
@@ -112,12 +169,12 @@ namespace StardewModdingAPI.Patches
         /// <returns>Returns whether to execute the original method.</returns>
         private static bool Before_NPC_CurrentDialogue(NPC __instance, ref Stack<Dialogue> __result, MethodInfo __originalMethod)
         {
-            if (DialogueErrorPatch.IsInterceptingCurrentDialogue)
+            const string key = nameof(Before_NPC_CurrentDialogue);
+            if (!PatchHelper.StartIntercept(key))
                 return true;
 
             try
             {
-                DialogueErrorPatch.IsInterceptingCurrentDialogue = true;
                 __result = (Stack<Dialogue>)__originalMethod.Invoke(__instance, new object[0]);
                 return false;
             }
@@ -129,8 +186,9 @@ namespace StardewModdingAPI.Patches
             }
             finally
             {
-                DialogueErrorPatch.IsInterceptingCurrentDialogue = false;
+                PatchHelper.StopIntercept(key);
             }
         }
+#endif
     }
 }

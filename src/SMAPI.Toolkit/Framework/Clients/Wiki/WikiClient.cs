@@ -1,3 +1,4 @@
+#if !SMAPI_FOR_MOBILE
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
@@ -105,6 +106,7 @@ namespace StardewModdingAPI.Toolkit.Framework.Clients.Wiki
                 string pullRequestUrl = this.GetAttribute(node, "data-pr");
                 IDictionary<string, string> mapLocalVersions = this.GetAttributeAsVersionMapping(node, "data-map-local-versions");
                 IDictionary<string, string> mapRemoteVersions = this.GetAttributeAsVersionMapping(node, "data-map-remote-versions");
+                string[] changeUpdateKeys = this.GetAttributeAsCsv(node, "data-change-update-keys");
 
                 // parse stable compatibility
                 WikiCompatibilityInfo compatibility = new WikiCompatibilityInfo
@@ -153,6 +155,7 @@ namespace StardewModdingAPI.Toolkit.Framework.Clients.Wiki
                     Warnings = warnings,
                     PullRequestUrl = pullRequestUrl,
                     DevNote = devNote,
+                    ChangeUpdateKeys = changeUpdateKeys,
                     MapLocalVersions = mapLocalVersions,
                     MapRemoteVersions = mapRemoteVersions,
                     Anchor = anchor
@@ -231,7 +234,7 @@ namespace StardewModdingAPI.Toolkit.Framework.Clients.Wiki
 
             // parse
             // Specified on the wiki in the form "remote version → mapped version; another remote version → mapped version"
-            IDictionary<string, string> map = new Dictionary<string, string>(StringComparer.InvariantCultureIgnoreCase);
+            IDictionary<string, string> map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             foreach (string pair in raw.Split(';'))
             {
                 string[] versions = pair.Split('→');
@@ -269,3 +272,4 @@ namespace StardewModdingAPI.Toolkit.Framework.Clients.Wiki
         }
     }
 }
+#endif

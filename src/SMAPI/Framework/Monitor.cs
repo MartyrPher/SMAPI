@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using StardewModdingAPI.Framework.Logging;
 using StardewModdingAPI.Internal.ConsoleWriting;
@@ -14,17 +15,20 @@ namespace StardewModdingAPI.Framework
         /// <summary>The name of the module which logs messages using this instance.</summary>
         private readonly string Source;
 
-        /// <summary>Handles writing color-coded text to the console.</summary>
-        private readonly ColorfulConsoleWriter ConsoleWriter;
+        /// <summary>Handles writing text to the console.</summary>
+        private readonly IConsoleWriter ConsoleWriter;
 
-        /// <summary>Manages access to the console output.</summary>
-        private readonly ConsoleInterceptionManager ConsoleInterceptor;
+        /// <summary>Prefixing a message with this character indicates that the console interceptor should write the string without intercepting it. (The character itself is not written.)</summary>
+        private readonly char IgnoreChar;
 
         /// <summary>The log file to which to write messages.</summary>
         private readonly LogFileManager LogFile;
 
         /// <summary>The maximum length of the <see cref="LogLevel"/> values.</summary>
         private static readonly int MaxLevelLength = (from level in Enum.GetValues(typeof(LogLevel)).Cast<LogLevel>() select level.ToString().Length).Max();
+
+        /// <summary>A cache of messages that should only be logged once.</summary>
+        private readonly HashSet<string> LogOnceCache = new HashSet<string>();
 
 
         /*********
@@ -48,11 +52,11 @@ namespace StardewModdingAPI.Framework
         *********/
         /// <summary>Construct an instance.</summary>
         /// <param name="source">The name of the module which logs messages using this instance.</param>
-        /// <param name="consoleInterceptor">Intercepts access to the console output.</param>
+        /// <param name="ignoreChar">A character which indicates the message should not be intercepted if it appears as the first character of a string written to the console. The character itself is not logged in that case.</param>
         /// <param name="logFile">The log file to which to write messages.</param>
         /// <param name="colorConfig">The colors to use for text written to the SMAPI console.</param>
         /// <param name="isVerbose">Whether verbose logging is enabled. This enables more detailed diagnostic messages than are normally needed.</param>
-        public Monitor(string source, ConsoleInterceptionManager consoleInterceptor, LogFileManager logFile, ColorSchemeConfig colorConfig, bool isVerbose)
+        public Monitor(string source, char ignoreChar, LogFileManager logFile, ColorSchemeConfig colorConfig, bool isVerbose)
         {
             // validate
             if (string.IsNullOrWhiteSpace(source))
@@ -62,7 +66,7 @@ namespace StardewModdingAPI.Framework
             this.Source = source;
             this.LogFile = logFile ?? throw new ArgumentNullException(nameof(logFile), "The log file manager cannot be null.");
             this.ConsoleWriter = new ColorfulConsoleWriter(Constants.Platform, colorConfig);
-            this.ConsoleInterceptor = consoleInterceptor;
+            this.IgnoreChar = ignoreChar;
             this.IsVerbose = isVerbose;
         }
 
@@ -72,6 +76,15 @@ namespace StardewModdingAPI.Framework
         public void Log(string message, LogLevel level = LogLevel.Trace)
         {
             this.LogImpl(this.Source, message, (ConsoleLogLevel)level);
+        }
+
+        /// <summary>Log a message for the player or developer, but only if it hasn't already been logged since the last game launch.</summary>
+        /// <param name="message">The message to log.</param>
+        /// <param name="level">The log severity level.</param>
+        public void LogOnce(string message, LogLevel level = LogLevel.Trace)
+        {
+            if (this.LogOnceCache.Add($"{message}|{level}"))
+                this.LogImpl(this.Source, message, (ConsoleLogLevel)level);
         }
 
         /// <summary>Log a message that only appears when <see cref="IMonitor.IsVerbose"/> is enabled.</summary>
@@ -86,7 +99,7 @@ namespace StardewModdingAPI.Framework
         internal void Newline()
         {
             if (this.WriteToConsole)
-                this.ConsoleInterceptor.ExclusiveWriteWithoutInterception(Console.WriteLine);
+                Console.WriteLine();
             this.LogFile.WriteLine("");
         }
 
@@ -123,16 +136,13 @@ namespace StardewModdingAPI.Framework
 
             // write to console
             if (this.WriteToConsole && (this.ShowTraceInConsole || level != ConsoleLogLevel.Trace))
-            {
-                this.ConsoleInterceptor.ExclusiveWriteWithoutInterception(() =>
-                {
-                    this.ConsoleWriter.WriteLine(consoleMessage, level);
-                });
-            }
+                this.ConsoleWriter.WriteLine(this.IgnoreChar + consoleMessage, level);
+#if SMAPI_FOR_MOBILE
             else if (this.ShowTraceInConsole || level != ConsoleLogLevel.Trace)
             {
                 SGameConsole.Instance.WriteLine(consoleMessage, level);
             }
+#endif
 
             // write to log file
             this.LogFile.WriteLine(fullMessage);

@@ -199,18 +199,19 @@ namespace StardewModdingAPI.Toolkit
         /// <returns>Returns whether parsing the version succeeded.</returns>
         public static bool TryParse(string version, out ISemanticVersion parsed)
         {
-            return SemanticVersion.TryParseNonStandard(version, out parsed) && !parsed.IsNonStandard();
+            return SemanticVersion.TryParse(version, allowNonStandard: false, out parsed);
         }
 
-        /// <summary>Parse a version string without throwing an exception if it fails, including support for non-standard extensions like <see cref="IPlatformSpecificVersion"/>.</summary>
+        /// <summary>Parse a version string without throwing an exception if it fails.</summary>
         /// <param name="version">The version string.</param>
+        /// <param name="allowNonStandard">Whether to allow non-standard extensions to semantic versioning.</param>
         /// <param name="parsed">The parsed representation.</param>
         /// <returns>Returns whether parsing the version succeeded.</returns>
-        public static bool TryParseNonStandard(string version, out ISemanticVersion parsed)
+        public static bool TryParse(string version, bool allowNonStandard, out ISemanticVersion parsed)
         {
             try
             {
-                parsed = new SemanticVersion(version, true);
+                parsed = new SemanticVersion(version, allowNonStandard);
                 return true;
             }
             catch
@@ -277,9 +278,9 @@ namespace StardewModdingAPI.Toolkit
                 if (curParts[i] != otherParts[i])
                 {
                     // unofficial is always lower-precedence
-                    if (otherParts[i].Equals("unofficial", StringComparison.InvariantCultureIgnoreCase))
+                    if (otherParts[i].Equals("unofficial", StringComparison.OrdinalIgnoreCase))
                         return curNewer;
-                    if (curParts[i].Equals("unofficial", StringComparison.InvariantCultureIgnoreCase))
+                    if (curParts[i].Equals("unofficial", StringComparison.OrdinalIgnoreCase))
                         return curOlder;
 
                     // compare numerically if possible
@@ -294,7 +295,7 @@ namespace StardewModdingAPI.Toolkit
             }
 
             // fallback (this should never happen)
-            return string.Compare(this.ToString(), new SemanticVersion(otherMajor, otherMinor, otherPatch, otherPlatformRelease, otherTag).ToString(), StringComparison.InvariantCultureIgnoreCase);
+            return string.Compare(this.ToString(), new SemanticVersion(otherMajor, otherMinor, otherPatch, otherPlatformRelease, otherTag).ToString(), StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>Assert that the current version is valid.</summary>

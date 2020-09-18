@@ -1,6 +1,11 @@
 using System.Diagnostics.CodeAnalysis;
+#if HARMONY_2
+using System;
+using HarmonyLib;
+#else
 using System.Reflection;
 using Harmony;
+#endif
 using StardewModdingAPI.Framework.Patching;
 using StardewValley;
 
@@ -17,9 +22,6 @@ namespace StardewModdingAPI.Patches
         *********/
         /// <summary>Writes messages to the console and log file on behalf of the game.</summary>
         private static IMonitor MonitorForGame;
-
-        /// <summary>Whether the method is currently being intercepted.</summary>
-        private static bool IsIntercepted;
 
 
         /*********
@@ -41,6 +43,15 @@ namespace StardewModdingAPI.Patches
 
         /// <summary>Apply the Harmony patch.</summary>
         /// <param name="harmony">The Harmony instance.</param>
+#if HARMONY_2
+        public void Apply(Harmony harmony)
+        {
+            harmony.Patch(
+                original: AccessTools.Method(typeof(GameLocation), "checkEventPrecondition"),
+                finalizer: new HarmonyMethod(this.GetType(), nameof(EventErrorPatch.Finalize_GameLocation_CheckEventPrecondition))
+            );
+        }
+#else
         public void Apply(HarmonyInstance harmony)
         {
             harmony.Patch(
@@ -48,11 +59,29 @@ namespace StardewModdingAPI.Patches
                 prefix: new HarmonyMethod(this.GetType(), nameof(EventErrorPatch.Before_GameLocation_CheckEventPrecondition))
             );
         }
+#endif
 
 
         /*********
         ** Private methods
         *********/
+#if HARMONY_2
+        /// <summary>The method to call instead of the GameLocation.CheckEventPrecondition.</summary>
+        /// <param name="__result">The return value of the original method.</param>
+        /// <param name="precondition">The precondition to be parsed.</param>
+        /// <param name="__exception">The exception thrown by the wrapped method, if any.</param>
+        /// <returns>Returns the exception to throw, if any.</returns>
+        private static Exception Finalize_GameLocation_CheckEventPrecondition(ref int __result, string precondition, Exception __exception)
+        {
+            if (__exception != null)
+            {
+                __result = -1;
+                EventErrorPatch.MonitorForGame.Log($"Failed parsing event precondition ({precondition}):\n{__exception.InnerException}", LogLevel.Error);
+            }
+
+            return null;
+        }
+#else
         /// <summary>The method to call instead of the GameLocation.CheckEventPrecondition.</summary>
         /// <param name="__instance">The instance being patched.</param>
         /// <param name="__result">The return value of the original method.</param>
@@ -61,12 +90,12 @@ namespace StardewModdingAPI.Patches
         /// <returns>Returns whether to execute the original method.</returns>
         private static bool Before_GameLocation_CheckEventPrecondition(GameLocation __instance, ref int __result, string precondition, MethodInfo __originalMethod)
         {
-            if (EventErrorPatch.IsIntercepted)
+            const string key = nameof(Before_GameLocation_CheckEventPrecondition);
+            if (!PatchHelper.StartIntercept(key))
                 return true;
 
             try
             {
-                EventErrorPatch.IsIntercepted = true;
                 __result = (int)__originalMethod.Invoke(__instance, new object[] { precondition });
                 return false;
             }
@@ -78,8 +107,9 @@ namespace StardewModdingAPI.Patches
             }
             finally
             {
-                EventErrorPatch.IsIntercepted = false;
+                PatchHelper.StopIntercept(key);
             }
         }
+#endif
     }
 }

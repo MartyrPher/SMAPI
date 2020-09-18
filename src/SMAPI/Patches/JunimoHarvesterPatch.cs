@@ -3,7 +3,11 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+#if HARMONY_2
+using HarmonyLib;
+#else
 using Harmony;
+#endif
 using Microsoft.Xna.Framework;
 using StardewModdingAPI.Framework.Patching;
 using StardewValley;
@@ -47,7 +51,13 @@ namespace StardewModdingAPI.Patches
 
         /// <summary>Apply the Harmony patch.</summary>
         /// <param name="harmony">The Harmony instance.</param>
-        public void Apply(HarmonyInstance harmony)
+        public void Apply(
+#if HARMONY_2
+            Harmony harmony
+#else
+            HarmonyInstance harmony
+#endif
+            )
         {
             harmony.Patch(
                 original: AccessTools.DeclaredConstructor(typeof(JunimoHarvester), new System.Type[] { typeof(Vector2), typeof(JunimoHut), typeof(int), typeof(Color?)}),
@@ -69,7 +79,6 @@ namespace StardewModdingAPI.Patches
             try
             {
                 Netcode.NetGuid guid = new Netcode.NetGuid(Game1.getFarm().buildings.GuidOf(myHome));
-                Netcode.INetSerializable netFields = guid.NetFields;
                 AccessTools.Field(typeof(JunimoHarvester), "netHome").SetValue(__instance, guid);
             }
             catch (TargetInvocationException ex)
